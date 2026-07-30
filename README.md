@@ -1,61 +1,58 @@
-# 🌐 محرك تدفق العمل والمعاملات الذكي | Macro Workflow System
+# 🌐 Macro Workflow & ITSM System
 
-نظام إدارة وتصميم نماذج تدفق العمل والمعاملات الذكي (Workflows & ITSM Engine) المبني باستخدام تقنيات **Next.js (React)** و **MySQL** كقاعدة بيانات خلفية، مع دعم كامل للربط المرن وتوزيع المهام التلقائي.
+A modern, no-code Workflow and ITSM Ticket Lifecycle Engine built with **Next.js (React)**, **MySQL**, and **Directus / REST API Integration**, featuring dynamic routing rules and flexible UI panels.
 
 ---
 
-## 🚀 التشغيل المحلي (Local Development)
+## 🚀 Local Development
 
-### المتطلبات الأساسية (Prerequisites)
-- **Node.js** (إصدار 18 أو أحدث)
+### Prerequisites
+- **Node.js** (v18 or higher)
 - **MySQL Database Server**
 
-### خطوات التشغيل
-1. **تثبيت الحزم والمكتبات:**
+### Setup & Run
+1. **Install Dependencies:**
    ```bash
    npm install
    ```
 
-2. **تهيئة ملفات الإعدادات البيئية (`.env.local`):**
-   قم بإنشاء ملف `.env.local` في المجلد الرئيسي للمشروع وأضف إعدادات الاتصال بقاعدة البيانات:
+2. **Configure Environment Variables (`.env.local`):**
+   Create a `.env.local` file in the root folder and add your database URL:
    ```env
    DATABASE_URL=mysql://username:password@localhost:3306/db_name
    ```
 
-3. **تشغيل خادم التطوير المحلي:**
+3. **Start Development Server:**
    ```bash
    npm run dev
    ```
-   افتح المتصفح واذهب إلى الرابط: [http://localhost:3000](http://localhost:3000)
+   Open your browser and navigate to: [http://localhost:3000](http://localhost:3000)
 
-4. **بناء النسخة الإنتاجية وتشغيلها محلياً:**
+4. **Build & Run Production Locally:**
    ```bash
    npm run build
-   ```
-   ثم لتشغيل خادم الإنتاج:
-   ```bash
    npm run start
    ```
 
 ---
 
-## 🪟 التشغيل على خادم Windows IIS (Deployment on IIS)
+## 🪟 Windows IIS Deployment
 
-لتشغيل تطبيق Next.js على خادم IIS، نستخدم أداة **iisnode** لتمكين تشغيل تطبيقات Node.js كخلفية داخل خادم ويب مايكروسوفت.
+To run a Next.js application on IIS, we use **iisnode** to host and manage the Node.js process inside the Microsoft Web Server.
 
-### المتطلبات (Requirements)
-1. **تثبيت Node.js** على السيرفر.
-2. **تثبيت IIS URL Rewrite Module** ([تحميل من مايكروسوفت](https://www.iis.net/downloads/microsoft/url-rewrite)).
-3. **تثبيت iisnode** ([تحميل من GitHub](https://github.com/Azure/iisnode/releases)).
+### Prerequisites
+1. **Node.js** installed on the Windows Server.
+2. **IIS URL Rewrite Module** installed ([Download from Microsoft](https://www.iis.net/downloads/microsoft/url-rewrite)).
+3. **iisnode** installed ([Download from GitHub Releases](https://github.com/Azure/iisnode/releases)).
 
-### خطوات التثبيت والإعداد
-1. **بناء المشروع (Build) محلياً أو على السيرفر:**
+### Deployment Steps
+1. **Build the Project:**
    ```bash
    npm run build
    ```
 
-2. **إنشاء ملف إدخال Node.js لـ IIS (مثال: `server.js`):**
-   قم بإنشاء ملف باسم `server.js` في المجلد الرئيسي للمشروع ليوجه IIS لتشغيل خادم Next.js:
+2. **Create Entry Script (`server.js`):**
+   Create a file named `server.js` in the project root:
    ```javascript
    const { createServer } = require('http');
    const { parse } = require('url');
@@ -84,8 +81,8 @@
    });
    ```
 
-3. **إعداد ملف الويب لـ IIS (`web.config`):**
-   قم بإنشاء ملف `web.config` في المجلد الرئيسي لتوجيه الطلبات عبر iisnode:
+3. **Configure URL Routing (`web.config`):**
+   Create a `web.config` file in the project root:
    ```xml
    <?xml version="1.0" encoding="utf-8"?>
    <configuration>
@@ -119,57 +116,57 @@
    </configuration>
    ```
 
-4. **إضافة الموقع in IIS:**
-   - افتح **IIS Manager**.
-   - اضغط بالزر الأيمن على **Sites** ثم اختر **Add Website**.
-   - اختر اسم الموقع، وحدد **Physical Path** ليشير إلى مجلد المشروع الرئيسي.
-   - حدد منفذ الوصول (Port) أو الـ Domain واضغط **OK**.
-   - تأكد من إعطاء حساب المجموعات الافتراضية لـ IIS (`IIS_IUSRS`) صلاحيات القراءة والكتابة على مجلد المشروع.
+4. **Add Site in IIS Manager:**
+   - Open **IIS Manager**.
+   - Right-click **Sites** -> **Add Website**.
+   - Set Site Name and point **Physical Path** to the project folder.
+   - Configure Port/Bindings and click **OK**.
+   - Ensure the `IIS_IUSRS` user group has Read/Write permissions on the project directory.
 
 ---
 
-## 🐧 التشغيل على خادم Linux (Ubuntu / RHEL)
+## 🐧 Linux Deployment (Ubuntu / RHEL)
 
-تعتبر طريقة التشغيل باستخدام **PM2** كمدير عمليات (Process Manager) مع **Nginx** كخادم عكسي (Reverse Proxy) هي الطريقة القياسية والأنسب إنتاجياً لبيئات Linux.
+For Linux production environments, the standard configuration uses **PM2** as the Node process manager and **Nginx** as the reverse proxy.
 
-### الخطوة 1: تثبيت Node.js و PM2
-قم بفتح الطرفية وتحديث الحزم ثم تثبيت Node.js و PM2 عالمياً:
+### Step 1: Install Node.js & PM2
+Open terminal and run:
 ```bash
 sudo apt update
 sudo apt install nodejs npm -y
 sudo npm install -g pm2
 ```
 
-### الخطوة 2: بناء المشروع وتشغيله باستخدام PM2
-1. انتقل لمجلد المشروع:
+### Step 2: Build & Start with PM2
+1. Navigate to directory:
    ```bash
    cd /var/www/workflow-engine
    ```
-2. تثبيت الحزم وبناء المشروع:
+2. Build production assets:
    ```bash
    npm install
    npm run build
    ```
-3. تشغيل الخدمة عبر PM2 لضمان استمراريتها حتى عند حدوث أخطاء أو إعادة تشغيل الخادم:
+3. Start the application with PM2:
    ```bash
    pm2 start npm --name "workflow-system" -- start
    ```
-4. تمكين PM2 من البدء تلقائياً مع إقلاع نظام التشغيل:
+4. Enable startup persistence:
    ```bash
    pm2 startup
    pm2 save
    ```
 
-### الخطوة 3: إعداد Nginx كخادم عكسي (Reverse Proxy)
-1. تثبيت خادم Nginx:
+### Step 3: Setup Nginx Reverse Proxy
+1. Install Nginx:
    ```bash
    sudo apt install nginx -y
    ```
-2. إنشاء ملف إعدادات جديد للموقع:
+2. Create configuration file:
    ```bash
    sudo nano /etc/nginx/sites-available/workflow
    ```
-3. أضف الإعدادات التالية (مع استبدال `yourdomain.com` برابط السيرفر أو الآي بي الخاص بك):
+3. Paste configuration (replace `yourdomain.com` with your Server IP/Domain):
    ```nginx
    server {
        listen 80;
@@ -187,11 +184,11 @@ sudo npm install -g pm2
        }
    }
    ```
-4. تفعيل الموقع وإعادة تشغيل Nginx:
+4. Enable the configuration and restart Nginx:
    ```bash
    sudo ln -s /etc/nginx/sites-available/workflow /etc/nginx/sites-enabled/
    sudo nginx -t
    sudo systemctl restart nginx
    ```
 
-الموقع الآن يعمل بكفاءة وتلقائية في الخلفية على بيئة خادم Linux! 🚀
+Your application is now hosted and runs automatically in the background! 🚀
