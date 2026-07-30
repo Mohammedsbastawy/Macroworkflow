@@ -1,0 +1,243 @@
+{
+  "workflows": [
+    {
+      "id": "wf_1785070874349",
+      "name": "Form Tets",
+      "slug": "form-tets",
+      "category": "HR",
+      "description": "Custom workflow form created via Enterprise Form Builder",
+      "icon": "📋",
+      "color": "#4F46E5",
+      "version": 1,
+      "published_version": 1,
+      "sla_total_hours": 48,
+      "react_flow_graph_json": null,
+      "steps": [
+        {
+          "id": "step-1",
+          "workflow_id": "wf_form-tets",
+          "react_flow_node_id": "node-step-1",
+          "name": "Department Manager",
+          "step_order": 1,
+          "step_type": "approval",
+          "execution_mode": "sequential",
+          "assignee_type": "manager_of_requester",
+          "assignee_value": "Direct Manager",
+          "ola_hours": 4,
+          "notify_on_assign": true,
+          "notify_on_complete": false,
+          "sort": 1
+        },
+        {
+          "id": "step-2",
+          "workflow_id": "wf_form-tets",
+          "react_flow_node_id": "node-step-2",
+          "name": "Department Head / Finance Review",
+          "step_order": 2,
+          "step_type": "approval",
+          "execution_mode": "sequential",
+          "assignee_type": "role",
+          "assignee_value": "Finance Manager",
+          "ola_hours": 8,
+          "notify_on_assign": true,
+          "notify_on_complete": false,
+          "sort": 2
+        }
+      ],
+      "fields": [
+        {
+          "id": "f-1785069709738",
+          "label": "العدد",
+          "key": "field_9738",
+          "type": "number",
+          "section": "General Request Details",
+          "width": "half",
+          "required": true,
+          "readOnly": false,
+          "placeholder": "",
+          "hasCondition": false,
+          "visibleToRequester": true,
+          "visibleToApproversOnly": false
+        },
+        {
+          "id": "f-1785069700368",
+          "label": "Long Text / Notes",
+          "key": "long_text_notes_2",
+          "type": "textarea",
+          "section": "General Request Details",
+          "width": "full",
+          "required": true,
+          "readOnly": false,
+          "placeholder": "",
+          "hasCondition": false,
+          "visibleToRequester": true,
+          "visibleToApproversOnly": false
+        }
+      ],
+      "date_created": "2026-07-26T13:01:14.349Z"
+    }
+  ],
+  "requests": [
+    {
+      "id": "req_1785069809233",
+      "request_number": "REQ-2026-99781",
+      "workflow_id": "wf_1785069771800",
+      "workflow_version": 1,
+      "workflow_version_snapshot": [
+        {
+          "id": "step-1",
+          "workflow_id": "wf_form-tets",
+          "react_flow_node_id": "node-step-1",
+          "name": "Department Manager",
+          "step_order": 1,
+          "step_type": "approval",
+          "execution_mode": "sequential",
+          "assignee_type": "manager_of_requester",
+          "assignee_value": "Direct Manager",
+          "ola_hours": 4,
+          "notify_on_assign": true,
+          "notify_on_complete": false,
+          "sort": 1
+        },
+        {
+          "id": "step-2",
+          "workflow_id": "wf_form-tets",
+          "react_flow_node_id": "node-step-2",
+          "name": "Department Head / Finance Review",
+          "step_order": 2,
+          "step_type": "approval",
+          "execution_mode": "sequential",
+          "assignee_type": "role",
+          "assignee_value": "Finance Manager",
+          "ola_hours": 8,
+          "notify_on_assign": true,
+          "notify_on_complete": false,
+          "sort": 2
+        }
+      ],
+      "requester_id": "Ahmed Mohamed (IT Staff)",
+      "title": "Form Tets Request",
+      "priority": "normal",
+      "status": "pending",
+      "current_step_node_id": "node-step-2",
+      "current_step_order": 2,
+      "current_assignees_json": [
+        "Finance Manager"
+      ],
+      "submitted_at": "2026-07-26T12:43:29.233Z",
+      "sla_deadline": "2026-07-28T12:43:29.233Z",
+      "ola_deadline": "2026-07-26T20:50:34.220Z",
+      "ola_accumulated_pause_ms": 0,
+      "date_created": "2026-07-26T12:43:29.233Z",
+      "date_updated": "2026-07-26T12:50:34.220Z"
+    }
+  ],
+  "request_values": [
+    {
+      "id": "val_1785069809233_29ag6",
+      "request_id": "req_1785069809233",
+      "field_key": "field_8779",
+      "value_text": "تجربة"
+    },
+    {
+      "id": "val_1785069809234_u5ou8",
+      "request_id": "req_1785069809233",
+      "field_key": "field_9738",
+      "value_text": "2",
+      "value_number": 2
+    },
+    {
+      "id": "val_1785069809234_5meru",
+      "request_id": "req_1785069809233",
+      "field_key": "long_text_notes_2",
+      "value_text": "تجربة"
+    }
+  ],
+  "approval_logs": [
+    {
+      "id": "log_1785069809234",
+      "request_id": "req_1785069809233",
+      "workflow_step_node_id": "node-step-1",
+      "step_order_snapshot": 1,
+      "actor_id": "Ahmed Mohamed",
+      "action": "submitted",
+      "comments": "Request submitted and routed automatically to first approval step.",
+      "decision_at": "2026-07-26T12:43:29.234Z"
+    },
+    {
+      "id": "log_1785070234220",
+      "request_id": "req_1785069809233",
+      "workflow_step_node_id": "node-step-2",
+      "step_order_snapshot": 2,
+      "actor_id": "Ahmed Mohamed",
+      "action": "approved",
+      "comments": "Decision: approved",
+      "decision_at": "2026-07-26T12:50:34.220Z"
+    }
+  ],
+  "role_permissions": {
+    "standard": {
+      "modules": {
+        "dashboard": true,
+        "catalog": true,
+        "newRequest": true,
+        "myRequests": true,
+        "pendingApprovals": false,
+        "workflowBuilder": false,
+        "usersIam": false,
+        "profileSetup": false,
+        "reportsSla": false,
+        "settings": false
+      },
+      "actions": {
+        "cancelRequest": true,
+        "delegateApproval": false,
+        "requestInfoRfi": false,
+        "exportReports": false,
+        "overrideOlaTimer": false
+      }
+    },
+    "approver": {
+      "modules": {
+        "dashboard": true,
+        "catalog": true,
+        "newRequest": true,
+        "myRequests": true,
+        "pendingApprovals": true,
+        "workflowBuilder": true,
+        "usersIam": false,
+        "profileSetup": false,
+        "reportsSla": true,
+        "settings": false
+      },
+      "actions": {
+        "cancelRequest": true,
+        "delegateApproval": true,
+        "requestInfoRfi": true,
+        "exportReports": true,
+        "overrideOlaTimer": false
+      }
+    },
+    "admin": {
+      "modules": {
+        "dashboard": true,
+        "catalog": true,
+        "newRequest": true,
+        "myRequests": true,
+        "pendingApprovals": true,
+        "workflowBuilder": true,
+        "usersIam": true,
+        "profileSetup": true,
+        "reportsSla": true,
+        "settings": true
+      },
+      "actions": {
+        "cancelRequest": true,
+        "delegateApproval": true,
+        "requestInfoRfi": true,
+        "exportReports": true,
+        "overrideOlaTimer": true
+      }
+    }
+  }
+}

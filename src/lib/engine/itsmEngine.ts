@@ -1,0 +1,143 @@
+import crypto from 'crypto';
+import { dbGet, dbUpdate, dbCreate } from '@/lib/db/mysqlClient';
+import { normalizeTicket, normalizeApprovalLog } from './store';
+import { SYSTEM_USERS, SystemUser } from './iamStore';
+import { WorkflowRequest, ApprovalLogEntry } from '@/types/workflow';
+
+export interface DocTypeDefinition {
+  id: string;
+  name: string;
+  slug: string;
+  module: string;
+  description: string;
+  icon: string;
+  color: string;
+  is_submittable: boolean;
+  version: number;
+}
+
+export interface TicketTask {
+  id: string;
+  ticket_id: string;
+  title: string;
+  assigned_to: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  due_date?: string;
+  date_created: string;
+}
+
+export interface TicketSlaLog {
+  id: string;
+  ticket_id: string;
+  step_node_id?: string;
+  event_type: 'started' | 'paused_rfi' | 'resumed_rfi' | 'breached' | 'escalated' | 'solved';
+  event_time: string;
+  notes: string;
+}
+
+/**
+ * Generate Cryptographic SHA256 Hash for Audit Trail Integrity (GLPI / Frappe Style Ledger)
+ */
+export function generateAuditHash(ticketId: string, actorId: string, action: string, timestamp: string): string {
+  const raw = `${ticketId}:${actorId}:${action}:${timestamp}:ENTERPRISE_SECRET_KEY`;
+  return crypto.createHash('sha256').update(raw).digest('hex');
+}
+
+/**
+ * Process GLPI Ticket RFI (Request For Information) — Pauses OLA Clock
+ * Now reads/writes from database instead of local JSON.
+ */
+export async function pauseTicketOlaClockForRfi(ticketId: string, actorName: string, rfiQuestion: string) {
+  // Find ticket in database
+  let ticket = await findTicket(ticketId);
+  if (!ticket) throw new Error(`Ticket ${ticketId} not found in database`);
+
+  const now = new Date().toISOString();
+
+  // Update ticket status in database
+  const updatedTicket = await dbUpdate('tickets', ticket.id, {
+    status: 'pending_info',
+    ola_clock_paused_at: now,
+    date_updated: now,
+  });
+
+  const auditHash = generateAuditHash(ticket.id, actorName, 'rfi_sent', now);
+
+  // Create approval log in database
+  const logPayload = {
+    ticket_id: ticket.id,
+    actor_id: actorName,
+    actor_name: actorName,
+    action: 'rfi_sent',
+    comments: `RFI Question: ${rfiQuestion} (OLA Timer Paused)`,
+    decision_at: now,
+    hash_sha256: auditHash,
+  };
+
+  const log = await dbCreate('approval_log', logPayload);
+
+  return { ticket: normalizeTicket(updatedTicket), log: normalizeApprovalLog(log) };
+}
+
+/**
+ * Process GLPI Ticket RFI Answer — Resumes OLA Clock
+ * Now reads/writes from database instead of local JSON.
+ */
+export async function resumeTicketOlaClockAfterRfi(ticketId: string, requesterName: string, answerText: string) {
+  let ticket = await findTicket(ticketId);
+  if (!ticket) throw new Error(`Ticket ${ticketId} not found in database`);
+
+  const now = new Date().toISOString();
+  const updatePayload: Record<string, any> = {
+    status: 'pending',
+    date_updated: now,
+  };
+
+  if (ticket.ola_clock_paused_at) {
+    const pausedMs = Date.now() - new Date(ticket.ola_clock_paused_at).getTime();
+    updatePayload.ola_accumulated_pause_ms = (ticket.ola_accumulated_pause_ms || 0) + pausedMs;
+    updatePayload.ola_clock_paused_at = null;
+
+    // Extend OLA deadline by paused duration
+    if (ticket.ola_deadline) {
+      const oldDeadline = new Date(ticket.ola_deadline).getTime();
+      updatePayload.ola_deadline = new Date(oldDeadline + pausedMs).toISOString();
+    }
+  }
+
+  const updatedTicket = await dbUpdate('tickets', ticket.id, updatePayload);
+
+  const auditHash = generateAuditHash(ticket.id, requesterName, 'rfi_answered', now);
+
+  const logPayload = {
+    ticket_id: ticket.id,
+    actor_id: requesterName,
+    actor_name: requesterName,
+    action: 'rfi_answered',
+    comments: `RFI Answer: ${answerText} (OLA Timer Resumed)`,
+    decision_at: now,
+    hash_sha256: auditHash,
+  };
+
+  const log = await dbCreate('approval_log', logPayload);
+
+  return { ticket: normalizeTicket(updatedTicket), log: normalizeApprovalLog(log) };
+}
+
+/**
+ * Helper: find a ticket by id or ticket_number in database
+ */
+async function findTicket(ticketId: string): Promise<any | null> {
+  // Try by direct ID first
+  try {
+    const rows = await dbGet('tickets', { id: { _eq: ticketId } }, undefined, 1);
+    if (rows.length > 0) return rows[0];
+  } catch {}
+
+  // Try by ticket_number
+  const byNumber = await dbGet('tickets', { ticket_number: { _eq: ticketId } }, undefined, 1);
+  if (byNumber.length > 0) return byNumber[0];
+
+  return null;
+}
+
