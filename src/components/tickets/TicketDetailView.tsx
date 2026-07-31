@@ -877,7 +877,7 @@ export function TicketDetailView({
                       <div style={{ marginBottom: 8, paddingTop: 8, borderTop: '1px dashed var(--color-border)' }}>
                         <div style={{ fontSize: 10, color: "var(--color-text-muted)", fontWeight: 700 }}>Assigned Technical Group</div>
                         <div style={{ fontSize: 12, fontWeight: 700, color: "#4F46E5", marginTop: 2 }}>
-                          🛠️ {request.assigned_group || "IT Helpdesk Team"}
+                          🛠️ {request.assigned_group || "Unassigned Group"}
                         </div>
                       </div>
 

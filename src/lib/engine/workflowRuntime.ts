@@ -6,13 +6,15 @@ type Edge = { source: string; target: string; sourceHandle?: string | null };
 
 function resolveAssignee(expression: string, ticket: any): string {
   const cleanExpr = String(expression || '').trim();
-  if (cleanExpr === '{{requester.manager}}' || cleanExpr.toLowerCase().includes('manager')) {
+  const lower = cleanExpr.toLowerCase();
+  
+  if (cleanExpr === '{{requester.manager}}' || lower === 'requester.manager' || lower === 'manager' || lower === 'direct manager' || lower === 'requester manager') {
     const reqUser = SYSTEM_USERS.find(u => u.id === ticket.requester_id || u.name === ticket.requester_name || u.email === ticket.requester_id);
     const managerId = reqUser?.direct_manager_id;
     const managerUser = SYSTEM_USERS.find(u => u.id === managerId);
     return managerUser ? `${managerUser.name} (${managerUser.job_title || 'Manager'})` : (managerId || 'Department Manager');
   }
-  if (cleanExpr === '{{requester.department_head}}' || cleanExpr.toLowerCase().includes('department_head') || cleanExpr.toLowerCase().includes('dept_head')) {
+  if (cleanExpr === '{{requester.department_head}}' || lower === 'requester.department_head' || lower === 'department_head' || lower === 'dept_head' || lower === 'dept head' || lower === 'department head') {
     const reqUser = SYSTEM_USERS.find(u => u.id === ticket.requester_id || u.name === ticket.requester_name || u.email === ticket.requester_id);
     const deptId = reqUser?.department_id;
     const dept = DEPARTMENTS.find(d => d.id === deptId);
