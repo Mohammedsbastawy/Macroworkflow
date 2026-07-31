@@ -136,7 +136,7 @@ export function Topbar() {
             >
               {usersList.map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.name} ({u.role.toUpperCase()})
+                  {u.name} ({u.role === 'admin' ? 'ADMIN' : 'SELF SERVICE'})
                 </option>
               ))}
             </select>
@@ -276,7 +276,7 @@ export function Topbar() {
                         color: u.role === "admin" ? "#92400E" : "#374151",
                       }}
                     >
-                      {u.role.toUpperCase()}
+                      {u.role === "admin" ? "ADMIN" : "SELF SERVICE"}
                     </span>
                   </div>
                 );
