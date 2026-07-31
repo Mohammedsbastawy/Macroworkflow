@@ -474,9 +474,8 @@ export function TicketDetailView({
             const userBelongsToGroup = currentGroupObj && (currentGroupObj.member_user_ids || (currentGroupObj as any).member_user_ids_json || []).includes(currentUser.id);
             const isDeptHead = DEPARTMENTS.some(d => d.head_user_id === currentUser.id);
             
-            // Check if current user is an assigned approver, technician, or system admin
-            const isAssignedApproverOrTech = 
-              currentUser.role === "admin" ||
+            // 1. Check if current user is an active Approver for this step
+            const isAssignedApprover = 
               (request.current_assignees_json || []).some((a: string) => {
                 const cleanA = a.toLowerCase();
                 return cleanA.includes(currentUser.name.toLowerCase()) || 
@@ -487,15 +486,18 @@ export function TicketDetailView({
                          return bg && (cleanA.includes(bg.id.toLowerCase()) || cleanA.includes(bg.name.toLowerCase()) || cleanA.includes((bg.code || '').toLowerCase()));
                        });
               }) ||
-              request.assigned_user === currentUser.id ||
-              request.current_approver === currentUser.id ||
+              request.current_approver === currentUser.id;
+
+            // 2. Check if current user is the Assigned Tech or member of Assigned Group
+            const isAssignedTech = 
+              request.assigned_user === currentUser.id || 
               userBelongsToGroup;
 
-            const canApprove = isAssignedApproverOrTech && request.status === "pending";
-            const canReject = isAssignedApproverOrTech && request.status === "pending";
-            const canRfi = isAssignedApproverOrTech && request.status === "pending";
-            const canReassign = (isAssignedApproverOrTech || currentUser.role === "admin") && request.status === "pending";
-            const canAssignGroupMember = currentUser.role === "admin" || isDeptHead || (userBelongsToGroup && Boolean((currentUser as any).can_assign_group_tickets));
+            const canApprove = (isAssignedApprover || currentUser.role === "admin") && request.status === "pending";
+            const canReject = (isAssignedApprover || currentUser.role === "admin") && request.status === "pending";
+            const canRfi = (isAssignedApprover || currentUser.role === "admin") && request.status === "pending";
+            const canReassign = (isAssignedTech || currentUser.role === "admin") && request.status === "pending";
+            const canAssignGroupMember = currentUser.role === "admin" || (currentGroupObj && currentGroupObj.manager_id === currentUser.id) || (userBelongsToGroup && Boolean((currentUser as any).can_assign_group_tickets));
 
             const groupMembers = currentGroupObj
               ? (currentGroupObj.member_user_ids || (currentGroupObj as any).member_user_ids_json || [])
@@ -505,9 +507,9 @@ export function TicketDetailView({
 
             // ITSM Standard Cancellation Rules:
             // 1. Can cancel if ticket is active/pending/draft (not already approved, solved, or closed)
-            // 2. Allowed for Requester (صاحب الطلب), Assigned Tech/Approver, or System Admin
+            // 2. Allowed for Requester (صاحب الطلب), Assigned Tech, or System Admin
             const isCancellable = !["approved", "solved", "closed", "cancelled"].includes(request.status);
-            const canCancel = isCancellable && (isRequester || isAssignedApproverOrTech || currentUser.role === "admin");
+            const canCancel = isCancellable && (isRequester || isAssignedTech || currentUser.role === "admin");
 
             const hasAnyAction = canApprove || canReject || canRfi || canReassign || canCancel || canAssignGroupMember;
 

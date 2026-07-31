@@ -22,6 +22,37 @@ function resolveAssignee(expression: string, ticket: any): string {
     const headUser = SYSTEM_USERS.find(u => u.id === headUserId);
     return headUser ? `${headUser.name} (${headUser.job_title || 'Department Head'})` : 'Department Head';
   }
+
+  // General Role / Job Title Matcher (Generic for all departments and levels)
+  let matchedUser = SYSTEM_USERS.find(u => {
+    const job = (u.job_title || '').toLowerCase();
+    const name = u.name.toLowerCase();
+    return job === lower || job.includes(lower) || name.includes(lower);
+  });
+
+  if (!matchedUser) {
+    // Keyword matching by department prefix + seniority word
+    matchedUser = SYSTEM_USERS.find(u => {
+      const job = (u.job_title || '').toLowerCase();
+      const deptWords = ['hr', 'human resources', 'finance', 'procurement', 'purchasing', 'marketing', 'branding', 'operations', 'ops', 'it', 'helpdesk'];
+      const matchedDept = deptWords.find(dWord => lower.includes(dWord));
+      if (matchedDept) {
+        const userDeptWords = [u.department_id.toLowerCase(), job];
+        const isSameDept = userDeptWords.some(udw => udw.includes(matchedDept));
+        if (isSameDept) {
+          const isLookingForHead = lower.includes('manager') || lower.includes('director') || lower.includes('head') || lower.includes('cfo');
+          const isUserHead = job.includes('director') || job.includes('head') || job.includes('chief') || job.includes('manager');
+          if (isLookingForHead === isUserHead) return true;
+        }
+      }
+      return false;
+    });
+  }
+
+  if (matchedUser) {
+    return `${matchedUser.name} (${matchedUser.job_title || 'Staff'})`;
+  }
+
   return cleanExpr;
 }
 
