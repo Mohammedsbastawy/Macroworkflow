@@ -109,6 +109,10 @@ export function TicketDetailView({
 
   const { request, workflow, values, logs } = detail || {};
 
+  const currentGroupObj = request ? BUSINESS_GROUPS.find(g => g.name === request.assigned_group || g.id === request.assigned_group || g.code === request.assigned_group) : null;
+  const userBelongsToGroup = currentUser && currentGroupObj && (currentGroupObj.member_user_ids || (currentGroupObj as any).member_user_ids_json || []).includes(currentUser.id);
+  const isAssignedGroupMemberOrAdmin = currentUser && (currentUser.role === "admin" || userBelongsToGroup || (request && request.assigned_user === currentUser.id));
+
   // Sync user state & DB role permissions dynamically
   const loadUserAndPermissions = async () => {
     let u = SYSTEM_USERS[0];
@@ -470,8 +474,6 @@ export function TicketDetailView({
           {/* ── ACTION BUTTONS PANEL (ITSM Standard Role Actions & Protection) ── */}
           {(() => {
             const isRequester = request.requester_id === currentUser.id || request.requester_id === currentUser.name || (request as any).requester_name === currentUser.name;
-            const currentGroupObj = BUSINESS_GROUPS.find(g => g.name === request.assigned_group || g.id === request.assigned_group || g.code === request.assigned_group);
-            const userBelongsToGroup = currentGroupObj && (currentGroupObj.member_user_ids || (currentGroupObj as any).member_user_ids_json || []).includes(currentUser.id);
             const isDeptHead = DEPARTMENTS.some(d => d.head_user_id === currentUser.id);
             
             // 1. Check if current user is an active Approver for this step
@@ -691,7 +693,16 @@ export function TicketDetailView({
                           <div>
                             <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-text-primary)" }}>{step.name || `Step ${step.step_order}`}</div>
                             <div style={{ fontSize: 10, color: "var(--color-text-secondary)" }}>
-                              Assignee Role: <strong>{step.assignee_value || "Department Manager"}</strong>
+                              {(() => {
+                                const stepLog = logs?.find((l: any) => l.workflow_step_node_id === step.react_flow_node_id || l.step_node_id === step.react_flow_node_id);
+                                if (isCompleted) {
+                                  return <span>Approved by: <strong>{stepLog?.actor_id || stepLog?.actor_name || "System"}</strong></span>;
+                                }
+                                if (isActive) {
+                                  return <span>Pending Approval from: <strong>{request.current_assignees_json?.join(', ') || request.current_approver || step.assignee_value}</strong></span>;
+                                }
+                                return <span>Assignee Role: <strong>{step.assignee_value || "Department Manager"}</strong></span>;
+                              })()}
                             </div>
                           </div>
                         </div>
@@ -713,82 +724,84 @@ export function TicketDetailView({
           )}
 
           {/* ── TIMELINE: COMMENTS & INTERNAL NOTES ── */}
-          <div className="card">
-            <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div className="card-title">💬 Activity Timeline & Comments</div>
-              <span className="tag">System Audit Ledger</span>
-            </div>
-            <div className="card-body">
-              {/* Comment Composer */}
-              <div style={{ marginBottom: 20, padding: 14, background: "var(--color-bg)", borderRadius: 8, border: "1px solid var(--color-border)" }}>
-                <textarea
-                  className="form-control"
-                  rows={2}
-                  placeholder={isInternalNote ? "Write an internal note (Visible ONLY to assigned reviewers & Admins)..." : "Add a public comment to requester..."}
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                />
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-                  {userPermissions.actions.addInternalNote && (
-                    <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: isInternalNote ? "#B45309" : "var(--color-text-muted)" }}>
-                      <input
-                        type="checkbox"
-                        checked={isInternalNote}
-                        onChange={(e) => setIsInternalNote(e.target.checked)}
-                      />
-                      🔒 Internal Note (Reviewers & Admins)
-                    </label>
-                  )}
-                  <button className="btn btn-primary btn-sm" onClick={handlePostComment} style={{ marginLeft: "auto" }}>
-                    Post {isInternalNote ? "Internal Note" : "Comment"}
-                  </button>
+          {isAssignedGroupMemberOrAdmin && (
+            <div className="card">
+              <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div className="card-title">💬 Activity Timeline & Comments</div>
+                <span className="tag">System Audit Ledger</span>
+              </div>
+              <div className="card-body">
+                {/* Comment Composer */}
+                <div style={{ marginBottom: 20, padding: 14, background: "var(--color-bg)", borderRadius: 8, border: "1px solid var(--color-border)" }}>
+                  <textarea
+                    className="form-control"
+                    rows={2}
+                    placeholder={isInternalNote ? "Write an internal note (Visible ONLY to assigned reviewers & Admins)..." : "Add a public comment to requester..."}
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                  />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                    {userPermissions.actions.addInternalNote && (
+                      <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: isInternalNote ? "#B45309" : "var(--color-text-muted)" }}>
+                        <input
+                          type="checkbox"
+                          checked={isInternalNote}
+                          onChange={(e) => setIsInternalNote(e.target.checked)}
+                        />
+                        🔒 Internal Note (Reviewers & Admins)
+                      </label>
+                    )}
+                    <button className="btn btn-primary btn-sm" onClick={handlePostComment} style={{ marginLeft: "auto" }}>
+                      Post {isInternalNote ? "Internal Note" : "Comment"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Timeline Feed */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {timelineItems.map((item: any) => {
+                    const isInternal = item.is_internal || item.action === "internal_note";
+                    // Hide internal notes from self-service users
+                    if (isInternal && currentUser.role === "selfservice") return null;
+
+                    return (
+                      <div
+                        key={item.id}
+                        style={{
+                          display: "flex",
+                          gap: 12,
+                          padding: 12,
+                          borderRadius: 8,
+                          background: isInternal ? "#FFFBEB" : "var(--color-surface)",
+                          border: `1px solid ${isInternal ? "#FCD34D" : "var(--color-border)"}`,
+                        }}
+                      >
+                        <div className="avatar md" style={{ background: isInternal ? "#F59E0B" : "var(--color-primary)", color: "#fff", flexShrink: 0 }}>
+                          {item.actor_id ? item.actor_id.substring(0, 2).toUpperCase() : "SY"}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700 }}>{item.actor_id || "System"}</span>
+                            {isInternal && (
+                              <span style={{ fontSize: 10, background: "#FEF3C7", color: "#B45309", padding: "1px 6px", borderRadius: 4, fontWeight: 800 }}>
+                                🔒 Internal Note
+                              </span>
+                            )}
+                            <span style={{ fontSize: 10, color: "var(--color-text-muted)", marginLeft: "auto" }}>
+                              {item.created_at ? new Date(item.created_at).toLocaleTimeString() : "Just now"}
+                            </span>
+                          </div>
+                          <p style={{ fontSize: 12, color: "var(--color-text-primary)", margin: 0 }}>
+                            {item.comments || item.action}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-
-              {/* Timeline Feed */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {timelineItems.map((item: any) => {
-                  const isInternal = item.is_internal || item.action === "internal_note";
-                  // Hide internal notes from self-service users
-                  if (isInternal && currentUser.role === "selfservice") return null;
-
-                  return (
-                    <div
-                      key={item.id}
-                      style={{
-                        display: "flex",
-                        gap: 12,
-                        padding: 12,
-                        borderRadius: 8,
-                        background: isInternal ? "#FFFBEB" : "var(--color-surface)",
-                        border: `1px solid ${isInternal ? "#FCD34D" : "var(--color-border)"}`,
-                      }}
-                    >
-                      <div className="avatar md" style={{ background: isInternal ? "#F59E0B" : "var(--color-primary)", color: "#fff", flexShrink: 0 }}>
-                        {item.actor_id ? item.actor_id.substring(0, 2).toUpperCase() : "SY"}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
-                          <span style={{ fontSize: 13, fontWeight: 700 }}>{item.actor_id || "System"}</span>
-                          {isInternal && (
-                            <span style={{ fontSize: 10, background: "#FEF3C7", color: "#B45309", padding: "1px 6px", borderRadius: 4, fontWeight: 800 }}>
-                              🔒 Internal Note
-                            </span>
-                          )}
-                          <span style={{ fontSize: 10, color: "var(--color-text-muted)", marginLeft: "auto" }}>
-                            {item.created_at ? new Date(item.created_at).toLocaleTimeString() : "Just now"}
-                          </span>
-                        </div>
-                        <p style={{ fontSize: 12, color: "var(--color-text-primary)", margin: 0 }}>
-                          {item.comments || item.action}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* ── RIGHT COLUMN: SIDEBAR METRICS & SIDEBAR FIELDS ── */}
@@ -926,7 +939,7 @@ export function TicketDetailView({
                   )}
 
                   {/* SECTION 3: SLA & Time Targets */}
-                  {cfg.showSlaMetrics !== false && (
+                  {cfg.showSlaMetrics !== false && isAssignedGroupMemberOrAdmin && (
                     <div style={{ background: 'var(--color-bg)', padding: 10, borderRadius: 8, border: '1px solid var(--color-border)' }}>
                       <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--color-primary)', textTransform: 'uppercase', marginBottom: 8 }}>
                         ⏱️ SLA / OLA Deadlines
