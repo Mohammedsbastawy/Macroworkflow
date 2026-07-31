@@ -19,6 +19,7 @@ import {
 } from './store';
 import { WorkflowStep, WorkflowFormField, WorkflowRequest, ApprovalLogEntry } from '@/types/workflow';
 import { continueGraphWorkflow, startGraphWorkflow } from './workflowRuntime';
+import { SYSTEM_USERS, BUSINESS_GROUPS } from './iamStore';
 
 // ============================================================
 //  Workflow Template CRUD
@@ -244,6 +245,22 @@ export function canUserAccessTicket(
     return true;
   }
 
+  // 3.5. Match Assigned Group Membership
+  const dbUser = SYSTEM_USERS.find(u => u.id === userId || u.name.toLowerCase() === userName || u.email.toLowerCase() === userEmail);
+  const userGroups = dbUser?.group_ids || [];
+  const ticketGroup = (ticket.assigned_group || '').toLowerCase();
+  if (ticketGroup) {
+    const belongsToAssignedGroup = userGroups.some(gId => {
+      const gObj = BUSINESS_GROUPS.find(bg => bg.id === gId);
+      return gObj && (
+        gObj.id.toLowerCase() === ticketGroup ||
+        gObj.name.toLowerCase() === ticketGroup ||
+        (gObj.code || '').toLowerCase() === ticketGroup
+      );
+    });
+    if (belongsToAssignedGroup) return true;
+  }
+
   // 4. Observer / Watcher
   const observers = (ticket.observer_id || '').toLowerCase();
   if (
@@ -290,6 +307,22 @@ export function isTicketInvolved(ticket: WorkflowRequest, user: { id?: string; n
 
   const observers = (ticket.observer_id || '').toLowerCase();
   if (observers && (userId && observers.includes(userId) || userEmail && observers.includes(userEmail) || userName && observers.includes(userName))) return true;
+
+  // Match Assigned Group Membership
+  const dbUser = SYSTEM_USERS.find(u => u.id === userId || u.name.toLowerCase() === userName || u.email.toLowerCase() === userEmail);
+  const userGroups = dbUser?.group_ids || [];
+  const ticketGroup = (ticket.assigned_group || '').toLowerCase();
+  if (ticketGroup) {
+    const belongsToAssignedGroup = userGroups.some(gId => {
+      const gObj = BUSINESS_GROUPS.find(bg => bg.id === gId);
+      return gObj && (
+        gObj.id.toLowerCase() === ticketGroup ||
+        gObj.name.toLowerCase() === ticketGroup ||
+        (gObj.code || '').toLowerCase() === ticketGroup
+      );
+    });
+    if (belongsToAssignedGroup) return true;
+  }
 
   return false;
 }
