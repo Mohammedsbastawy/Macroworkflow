@@ -120,6 +120,8 @@ export function normalizeTicket(raw: any): WorkflowRequest {
     current_approver: raw.current_approver || '',
     solution_type: raw.solution_type || '',
     solution_description: raw.solution_description || '',
+    assigned_group: raw.assigned_group || '',
+    assigned_user: raw.assigned_user || '',
     solved_date: raw.solved_date || raw.solved_at || null,
   };
 }
