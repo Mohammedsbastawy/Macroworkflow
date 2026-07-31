@@ -246,17 +246,18 @@ export function canUserAccessTicket(
   }
 
   // 3.5. Match Assigned Group Membership
-  const dbUser = SYSTEM_USERS.find(u => u.id === userId || u.name.toLowerCase() === userName || u.email.toLowerCase() === userEmail);
-  const userGroups = dbUser?.group_ids || [];
   const ticketGroup = (ticket.assigned_group || '').toLowerCase();
   if (ticketGroup) {
-    const belongsToAssignedGroup = userGroups.some(gId => {
-      const gObj = BUSINESS_GROUPS.find(bg => bg.id === gId);
-      return gObj && (
-        gObj.id.toLowerCase() === ticketGroup ||
-        gObj.name.toLowerCase() === ticketGroup ||
-        (gObj.code || '').toLowerCase() === ticketGroup
-      );
+    const belongsToAssignedGroup = BUSINESS_GROUPS.some(bg => {
+      const isMatch = bg.id.toLowerCase() === ticketGroup ||
+                      bg.name.toLowerCase() === ticketGroup ||
+                      (bg.code || '').toLowerCase() === ticketGroup;
+      if (!isMatch) return false;
+      const members = bg.member_user_ids || (bg as any).member_user_ids_json || [];
+      return members.some((m: any) => {
+        const cleanM = String(m).toLowerCase();
+        return cleanM === userId || cleanM === userEmail || cleanM === userName;
+      });
     });
     if (belongsToAssignedGroup) return true;
   }
@@ -313,13 +314,16 @@ export function isTicketInvolved(ticket: WorkflowRequest, user: { id?: string; n
   const userGroups = dbUser?.group_ids || [];
   const ticketGroup = (ticket.assigned_group || '').toLowerCase();
   if (ticketGroup) {
-    const belongsToAssignedGroup = userGroups.some(gId => {
-      const gObj = BUSINESS_GROUPS.find(bg => bg.id === gId);
-      return gObj && (
-        gObj.id.toLowerCase() === ticketGroup ||
-        gObj.name.toLowerCase() === ticketGroup ||
-        (gObj.code || '').toLowerCase() === ticketGroup
-      );
+    const belongsToAssignedGroup = BUSINESS_GROUPS.some(bg => {
+      const isMatch = bg.id.toLowerCase() === ticketGroup ||
+                      bg.name.toLowerCase() === ticketGroup ||
+                      (bg.code || '').toLowerCase() === ticketGroup;
+      if (!isMatch) return false;
+      const members = bg.member_user_ids || (bg as any).member_user_ids_json || [];
+      return members.some((m: any) => {
+        const cleanM = String(m).toLowerCase();
+        return cleanM === userId || cleanM === userEmail || cleanM === userName;
+      });
     });
     if (belongsToAssignedGroup) return true;
   }

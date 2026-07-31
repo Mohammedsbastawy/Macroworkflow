@@ -470,27 +470,37 @@ export function TicketDetailView({
           {/* ── ACTION BUTTONS PANEL (ITSM Standard Role Actions & Protection) ── */}
           {(() => {
             const isRequester = request.requester_id === currentUser.id || request.requester_id === currentUser.name || (request as any).requester_name === currentUser.name;
+            const currentGroupObj = BUSINESS_GROUPS.find(g => g.name === request.assigned_group || g.id === request.assigned_group || g.code === request.assigned_group);
+            const userBelongsToGroup = currentGroupObj && (currentGroupObj.member_user_ids || (currentGroupObj as any).member_user_ids_json || []).includes(currentUser.id);
+            const isDeptHead = DEPARTMENTS.some(d => d.head_user_id === currentUser.id);
             
             // Check if current user is an assigned approver, technician, or system admin
             const isAssignedApproverOrTech = 
               currentUser.role === "admin" ||
-              (request.current_assignees_json || []).some((a: string) => a.toLowerCase().includes(currentUser.name.toLowerCase()) || a.toLowerCase().includes(currentUser.id.toLowerCase()) || a.toLowerCase().includes(currentUser.role.toLowerCase())) ||
+              (request.current_assignees_json || []).some((a: string) => {
+                const cleanA = a.toLowerCase();
+                return cleanA.includes(currentUser.name.toLowerCase()) || 
+                       cleanA.includes(currentUser.id.toLowerCase()) || 
+                       cleanA.includes(currentUser.role.toLowerCase()) ||
+                       (currentUser.group_ids || []).some(gId => {
+                         const bg = BUSINESS_GROUPS.find(b => b.id === gId);
+                         return bg && (cleanA.includes(bg.id.toLowerCase()) || cleanA.includes(bg.name.toLowerCase()) || cleanA.includes((bg.code || '').toLowerCase()));
+                       });
+              }) ||
               request.assigned_user === currentUser.id ||
-              request.current_approver === currentUser.id;
+              request.current_approver === currentUser.id ||
+              userBelongsToGroup;
 
             const canApprove = isAssignedApproverOrTech && request.status === "pending";
             const canReject = isAssignedApproverOrTech && request.status === "pending";
             const canRfi = isAssignedApproverOrTech && request.status === "pending";
             const canReassign = (isAssignedApproverOrTech || currentUser.role === "admin") && request.status === "pending";
-            
-            const isAdmin = currentUser.role === "admin";
-            const currentGroupObj = BUSINESS_GROUPS.find(g => g.name === request.assigned_group || g.id === request.assigned_group || g.code === request.assigned_group);
-            const userBelongsToGroup = currentGroupObj && currentUser.group_ids && currentUser.group_ids.includes(currentGroupObj.id);
-            const isDeptHead = DEPARTMENTS.some(d => d.head_user_id === currentUser.id);
-            const canAssignGroupMember = isAdmin || isDeptHead || (userBelongsToGroup && Boolean((currentUser as any).can_assign_group_tickets));
+            const canAssignGroupMember = currentUser.role === "admin" || isDeptHead || (userBelongsToGroup && Boolean((currentUser as any).can_assign_group_tickets));
 
             const groupMembers = currentGroupObj
-              ? SYSTEM_USERS.filter(u => currentGroupObj.member_user_ids.includes(u.id))
+              ? (currentGroupObj.member_user_ids || (currentGroupObj as any).member_user_ids_json || [])
+                  .map((mId: string) => SYSTEM_USERS.find(u => u.id === mId))
+                  .filter((u): u is typeof SYSTEM_USERS[0] => !!u)
               : SYSTEM_USERS;
 
             // ITSM Standard Cancellation Rules:

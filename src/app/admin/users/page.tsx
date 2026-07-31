@@ -43,6 +43,9 @@ export default function UsersIamPage() {
   const [showAddGroupModal, setShowAddGroupModal] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [groupCode, setGroupCode] = useState("");
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [groupManagerId, setGroupManagerId] = useState("");
+  const [selectedGroupMemberIds, setSelectedGroupMemberIds] = useState<string[]>([]);
 
   const loadData = async () => {
     setLoading(true);
@@ -110,20 +113,25 @@ export default function UsersIamPage() {
     await loadData();
   };
 
-  const handleCreateGroup = async (e: React.FormEvent) => {
+  const handleSaveGroup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!groupName.trim()) return;
 
-    const newGroupPayload = {
+    const groupPayload = {
+      id: editingGroupId || undefined,
       name: groupName,
       code: groupCode || groupName.substring(0, 4).toUpperCase(),
-      member_user_ids: [],
+      member_user_ids: selectedGroupMemberIds,
+      manager_id: groupManagerId || undefined,
     };
 
-    await saveBusinessGroupAction(newGroupPayload);
+    await saveBusinessGroupAction(groupPayload);
     setShowAddGroupModal(false);
+    setEditingGroupId(null);
     setGroupName("");
     setGroupCode("");
+    setGroupManagerId("");
+    setSelectedGroupMemberIds([]);
     await loadData();
   };
 
@@ -291,7 +299,11 @@ export default function UsersIamPage() {
       {activeTab === "groups" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
           {groups.map((g) => {
-            const groupMembers = users.filter((u) => u.group_ids.includes(g.id));
+            const groupMembers = users.filter((u) => {
+              const members = g.member_user_ids || (g as any).member_user_ids_json || [];
+              return members.includes(u.id);
+            });
+            const managerUser = users.find((u) => u.id === g.manager_id);
             return (
               <div key={g.id} className="card">
                 <div className="card-body">
@@ -299,14 +311,31 @@ export default function UsersIamPage() {
                     <div style={{ fontWeight: 800, fontSize: 15 }}>👥 {g.name}</div>
                     <span className="tag" style={{ background: "#FEF3C7", color: "#B45309" }}>{g.code}</span>
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 12 }}>
-                    Cross-departmental Membership ({groupMembers.length} members)
+                  <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8 }}>
+                    Manager: <strong style={{ color: "var(--color-primary)" }}>{managerUser?.name || "Unassigned"}</strong>
                   </div>
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 12 }}>
+                    Membership ({groupMembers.length} members)
+                  </div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 14 }}>
                     {groupMembers.map((m) => (
                       <span key={m.id} className="tag" style={{ fontSize: 10 }}>{m.name.split(" ")[0]}</span>
                     ))}
                   </div>
+                  <button
+                    className="btn btn-outline btn-xs"
+                    onClick={() => {
+                      setEditingGroupId(g.id);
+                      setGroupName(g.name);
+                      setGroupCode(g.code);
+                      setGroupManagerId(g.manager_id || "");
+                      setSelectedGroupMemberIds(g.member_user_ids || (g as any).member_user_ids_json || []);
+                      setShowAddGroupModal(true);
+                    }}
+                    style={{ fontSize: 11, padding: "2px 8px" }}
+                  >
+                    ✏️ Edit Group / Members
+                  </button>
                 </div>
               </div>
             );
@@ -406,15 +435,15 @@ export default function UsersIamPage() {
         </div>
       )}
 
-      {/* ── MODAL 3: ADD BUSINESS GROUP ── */}
+      {/* ── MODAL 3: ADD/EDIT BUSINESS GROUP ── */}
       {showAddGroupModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)", backdropFilter: "blur(4px)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div className="card" style={{ width: "100%", maxWidth: 440, boxShadow: "var(--shadow-lg)" }}>
+          <div className="card" style={{ width: "100%", maxWidth: 460, boxShadow: "var(--shadow-lg)" }}>
             <div className="card-header">
-              <div className="card-title">👥 Add Business Group</div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowAddGroupModal(false)}>✕</button>
+              <div className="card-title">{editingGroupId ? "👥 Edit Business Group" : "👥 Add Business Group"}</div>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddGroupModal(false); setEditingGroupId(null); }}>✕</button>
             </div>
-            <form onSubmit={handleCreateGroup}>
+            <form onSubmit={handleSaveGroup}>
               <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Group Name <span className="required">*</span></label>
@@ -424,9 +453,41 @@ export default function UsersIamPage() {
                   <label className="form-label">Group Code</label>
                   <input className="form-control" placeholder="e.g. STEER_COMM" value={groupCode} onChange={(e) => setGroupCode(e.target.value)} />
                 </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Group Manager / Owner</label>
+                  <select className="form-control" value={groupManagerId} onChange={(e) => setGroupManagerId(e.target.value)}>
+                    <option value="">-- No Manager / Unassigned --</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        👤 {u.name} ({u.job_title || 'Employee'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontWeight: 700 }}>Group Members (أعضاء المجموعة)</label>
+                  <div style={{ maxHeight: 180, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6, background: "var(--color-bg)", padding: 10, borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}>
+                    {users.map((u) => {
+                      const isChecked = selectedGroupMemberIds.includes(u.id);
+                      return (
+                        <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) setSelectedGroupMemberIds([...selectedGroupMemberIds, u.id]);
+                              else setSelectedGroupMemberIds(selectedGroupMemberIds.filter((id) => id !== u.id));
+                            }}
+                          />
+                          <span style={{ fontWeight: isChecked ? 700 : 400 }}>{u.name} ({u.job_title || 'Employee'})</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
               <div style={{ padding: "12px 20px", borderTop: "1px solid var(--color-border)", display: "flex", justifyContent: "flex-end", gap: 10 }}>
-                <button type="button" className="btn btn-outline" onClick={() => setShowAddGroupModal(false)}>Cancel</button>
+                <button type="button" className="btn btn-outline" onClick={() => { setShowAddGroupModal(false); setEditingGroupId(null); }}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Save Business Group</button>
               </div>
             </form>

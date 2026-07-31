@@ -948,6 +948,7 @@ export async function saveBusinessGroupAction(payload: {
   code: string;
   member_user_ids: string[];
   is_active?: boolean;
+  manager_id?: string;
 }) {
   const { dbCreate, dbUpdate } = await import('@/lib/db/mysqlClient');
   const record = {

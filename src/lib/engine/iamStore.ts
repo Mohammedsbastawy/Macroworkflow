@@ -10,6 +10,7 @@ export interface BusinessGroup {
   name: string;
   code: string;
   member_user_ids: string[];
+  manager_id?: string;
 }
 
 export interface SystemUser {
