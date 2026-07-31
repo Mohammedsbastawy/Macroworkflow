@@ -809,16 +809,25 @@ export function TicketDetailView({
                       <div style={{ marginBottom: 8, paddingTop: 8, borderTop: '1px dashed var(--color-border)' }}>
                         <div style={{ fontSize: 10, color: "var(--color-text-muted)", fontWeight: 700 }}>Assigned Technical Group</div>
                         <div style={{ fontSize: 12, fontWeight: 700, color: "#4F46E5", marginTop: 2 }}>
-                          🛠️ {request.assigned_group || (request.current_assignees_json?.[0] || "IT Helpdesk Team")}
+                          🛠️ {request.assigned_group || "IT Helpdesk Team"}
                         </div>
                       </div>
 
                       <div style={{ marginBottom: 8 }}>
                         <div style={{ fontSize: 10, color: "var(--color-text-muted)", fontWeight: 700 }}>Assigned Technician / Reviewer</div>
                         <div style={{ fontSize: 12, fontWeight: 700, color: "#059669", marginTop: 2 }}>
-                          👤 {request.assigned_user || (request.current_assignees_json && request.current_assignees_json.length > 0 ? request.current_assignees_json.join(', ') : "Unassigned")}
+                          👤 {request.assigned_user || "Unassigned"}
                         </div>
                       </div>
+
+                      {request.status === 'pending' && request.current_assignees_json && request.current_assignees_json.length > 0 && (
+                        <div style={{ marginBottom: 8, paddingTop: 8, borderTop: '1px dashed var(--color-border)' }}>
+                          <div style={{ fontSize: 10, color: "var(--color-text-muted)", fontWeight: 700 }}>⏳ Pending Approval From (قيد الاعتماد من)</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-primary)", marginTop: 2 }}>
+                            🔑 {request.current_assignees_json.join(', ')}
+                          </div>
+                        </div>
+                      )}
 
                       {cfg.showBusinessUnitBrand !== false && request.unit && (
                         <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed var(--color-border)' }}>

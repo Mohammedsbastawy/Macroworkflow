@@ -479,9 +479,13 @@ export async function submitRequest(params: {
   if (defaultObservers) {
     initialObservers.push(...defaultObservers.split(',').map(s => s.trim()).filter(Boolean));
   }
+  if (runtimeTicket.observer_id) {
+    initialObservers.push(...runtimeTicket.observer_id.split(',').map((s: string) => s.trim()).filter(Boolean));
+  }
+  const uniqueObservers = Array.from(new Set(initialObservers));
 
   try {
-    await addObserversToTicket(runtimeTicket.id || ticketId, initialObservers);
+    await addObserversToTicket(runtimeTicket.id || ticketId, uniqueObservers);
   } catch (e) {
     // Non-fatal — observer persistence should not block ticket creation
     console.warn('[addObserversToTicket failed]', e);
