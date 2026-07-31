@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { SYSTEM_USERS, SystemUser, DEFAULT_ROLE_PERMISSIONS } from "@/lib/engine/iamStore";
+import { SYSTEM_USERS, SystemUser, DEFAULT_ROLE_PERMISSIONS, BUSINESS_GROUPS, DEPARTMENTS } from "@/lib/engine/iamStore";
 
 export interface TicketDetailProps {
   requestId: string;
@@ -96,6 +96,10 @@ export function TicketDetailView({
   const [commentText, setCommentText] = useState("");
   const [isInternalNote, setIsInternalNote] = useState(false);
   const [timelineItems, setTimelineItems] = useState<any[]>([]);
+
+  // Assignment Modal States
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedAssigneeName, setSelectedAssigneeName] = useState("");
 
   // RFI Modal state
   const [showRfiModal, setShowRfiModal] = useState(false);
@@ -201,6 +205,21 @@ export function TicketDetailView({
       setRfiAnswer("");
     } catch (err) {
       alert("Error: " + err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAssignMemberSubmit = async () => {
+    if (!selectedAssigneeName) return;
+    setIsSubmitting(true);
+    try {
+      const { assignTicketUserAction } = await import("@/app/actions/workflowActions");
+      await assignTicketUserAction(request.id, selectedAssigneeName, currentUser.name);
+      setShowAssignModal(false);
+      onRefresh();
+    } catch (e) {
+      alert("Error assigning member: " + e);
     } finally {
       setIsSubmitting(false);
     }
@@ -464,13 +483,23 @@ export function TicketDetailView({
             const canRfi = isAssignedApproverOrTech && request.status === "pending";
             const canReassign = (isAssignedApproverOrTech || currentUser.role === "admin") && request.status === "pending";
             
+            const isAdmin = currentUser.role === "admin";
+            const currentGroupObj = BUSINESS_GROUPS.find(g => g.name === request.assigned_group || g.id === request.assigned_group || g.code === request.assigned_group);
+            const userBelongsToGroup = currentGroupObj && currentUser.group_ids && currentUser.group_ids.includes(currentGroupObj.id);
+            const isDeptHead = DEPARTMENTS.some(d => d.head_user_id === currentUser.id);
+            const canAssignGroupMember = isAdmin || isDeptHead || (userBelongsToGroup && Boolean((currentUser as any).can_assign_group_tickets));
+
+            const groupMembers = currentGroupObj
+              ? SYSTEM_USERS.filter(u => currentGroupObj.member_user_ids.includes(u.id))
+              : SYSTEM_USERS;
+
             // ITSM Standard Cancellation Rules:
             // 1. Can cancel if ticket is active/pending/draft (not already approved, solved, or closed)
             // 2. Allowed for Requester (صاحب الطلب), Assigned Tech/Approver, or System Admin
             const isCancellable = !["approved", "solved", "closed", "cancelled"].includes(request.status);
             const canCancel = isCancellable && (isRequester || isAssignedApproverOrTech || currentUser.role === "admin");
 
-            const hasAnyAction = canApprove || canReject || canRfi || canReassign || canCancel;
+            const hasAnyAction = canApprove || canReject || canRfi || canReassign || canCancel || canAssignGroupMember;
 
             return (
               <div className="card" style={{ padding: 16, background: "var(--color-surface)", border: "1px solid var(--color-border)" }}>
@@ -499,6 +528,16 @@ export function TicketDetailView({
                         ❓ Request Info (RFI)
                       </button>
                     )}
+                    {canAssignGroupMember && (
+                      <button className="btn btn-ghost" onClick={() => {
+                        if (groupMembers.length > 0) {
+                          setSelectedAssigneeName(groupMembers[0].name);
+                        }
+                        setShowAssignModal(true);
+                      }} style={{ fontSize: 12, color: "var(--color-primary)", fontWeight: 700 }}>
+                        👤 Assign to Group Member
+                      </button>
+                    )}
                     {canReassign && (
                       <button className="btn btn-ghost" onClick={() => alert("Reassign modal opened")} style={{ fontSize: 12 }}>
                         🔄 Reassign Group
@@ -522,6 +561,35 @@ export function TicketDetailView({
                 ) : (
                   <div style={{ fontSize: 12, color: "var(--color-text-muted)", fontStyle: "italic" }}>
                     👁️ View-Only Ticket Mode — No pending action required from your account.
+                  </div>
+                )}
+
+                {/* Assign to Group Member Modal */}
+                {showAssignModal && (
+                  <div style={{ marginTop: 14, padding: 14, background: "var(--color-bg)", borderRadius: 8, border: "1px solid var(--color-primary)" }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "var(--color-text-primary)", marginBottom: 6 }}>
+                      Select Group Member to Assign (تعيين موظف من المجموعة):
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <select
+                        className="form-control"
+                        value={selectedAssigneeName}
+                        onChange={(e) => setSelectedAssigneeName(e.target.value)}
+                        style={{ fontSize: 12, fontWeight: 700 }}
+                      >
+                        {groupMembers.map(m => (
+                          <option key={m.id} value={m.name}>
+                            👤 {m.name} ({m.job_title || 'Team Member'})
+                          </option>
+                        ))}
+                      </select>
+                      <button className="btn btn-primary" onClick={handleAssignMemberSubmit} disabled={isSubmitting} style={{ fontSize: 12, fontWeight: 700 }}>
+                        Assign User
+                      </button>
+                      <button className="btn btn-ghost" onClick={() => setShowAssignModal(false)} style={{ fontSize: 12, fontWeight: 700 }}>
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 )}
 

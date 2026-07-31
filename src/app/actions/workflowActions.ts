@@ -899,6 +899,7 @@ export async function saveSystemUserAction(payload: {
   delegation_start_date?: string;
   delegation_end_date?: string;
   delegation_notes?: string;
+  can_assign_group_tickets?: boolean | number;
 }) {
   const { dbCreate, dbUpdate } = await import('@/lib/db/mysqlClient');
   const record = {
@@ -1241,6 +1242,28 @@ export async function updateTicketClassificationAction(
   revalidatePath(`/requests/${requestId}`);
   revalidatePath('/requests');
   revalidatePath('/approvals');
+  return { success: true };
+}
+
+export async function assignTicketUserAction(ticketId: string, assignedUser: string, actorName: string) {
+  const now = new Date().toISOString();
+  await dbUpdate('tickets', ticketId, {
+    assigned_user: assignedUser,
+    date_updated: now,
+  });
+
+  // Create audit comment log
+  await dbCreate('approval_log', {
+    id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    ticket_id: ticketId,
+    action: 'commented',
+    actor_name: actorName,
+    comments: `Ticket assigned to employee: ${assignedUser} by ${actorName}.`,
+    decision_at: now,
+  });
+
+  revalidatePath('/requests');
+  revalidatePath(`/requests/${ticketId}`);
   return { success: true };
 }
 

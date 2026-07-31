@@ -23,6 +23,7 @@ export interface SystemUser {
   job_title?: string;
   direct_manager_id?: string;
   unit?: string;
+  can_assign_group_tickets?: boolean | number;
 }
 
 export interface VisibilityRules {

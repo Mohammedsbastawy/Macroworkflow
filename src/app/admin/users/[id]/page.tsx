@@ -40,6 +40,7 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
   const [isActive, setIsActive] = useState(true);
   const [avatarInitials, setAvatarInitials] = useState("");
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [canAssignGroupTickets, setCanAssignGroupTickets] = useState(false);
 
   // Delegation States
   const [delegationEnabled, setDelegationEnabled] = useState(false);
@@ -80,6 +81,7 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
         setDelegationStartDate((currentUser as any).delegation_start_date || "");
         setDelegationEndDate((currentUser as any).delegation_end_date || "");
         setDelegationNotes((currentUser as any).delegation_notes || "");
+        setCanAssignGroupTickets(Boolean(currentUser.can_assign_group_tickets));
       }
       setLoading(false);
     });
@@ -114,6 +116,7 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
         delegation_start_date: delegationStartDate,
         delegation_end_date: delegationEndDate,
         delegation_notes: delegationNotes,
+        can_assign_group_tickets: canAssignGroupTickets ? 1 : 0,
       });
 
       setSaveMsg(lang === "ar" ? "✅ تم حفظ وتحديث بيانات المستخدم بنجاح في قاعدة البيانات!" : "✅ User profile updated successfully!");
@@ -431,6 +434,25 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
                   </div>
                 </div>
               </label>
+ 
+              <div style={{ marginTop: 16, borderTop: "1px dashed var(--color-border)", paddingTop: 16 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={canAssignGroupTickets}
+                    onChange={(e) => setCanAssignGroupTickets(e.target.checked)}
+                    style={{ width: 16, height: 16 }}
+                  />
+                  <div>
+                    <strong style={{ fontSize: 13, color: "var(--color-text-primary)" }}>
+                      {lang === "ar" ? "تفويض تعيين التذاكر للمجموعة (Group Ticket Assignment)" : "Group Ticket Assignment Delegation"}
+                    </strong>
+                    <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 2 }}>
+                      {lang === "ar" ? "يسمح للموظف بتعيين وتوزيع التذاكر الموجهة لمجموعته على زملائه." : "Allows this employee to assign group-routed tickets to specific team members."}
+                    </div>
+                  </div>
+                </label>
+              </div>
             </div>
           </div>
         )}
