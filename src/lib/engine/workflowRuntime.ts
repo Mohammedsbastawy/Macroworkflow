@@ -154,7 +154,15 @@ async function run(ticket: any, workflow: any, startNodeId: string, suppliedValu
       if (node.type !== 'trigger') current = await executeAction(current, node);
       edge = nextEdge(edges, node.id);
     }
-    if (!edge) throw new Error(`Workflow node "${node.id}" has no outgoing connection`);
+    if (!edge) {
+      const finalStatus = current.status === 'pending' ? 'approved' : current.status;
+      return dbUpdate('tickets', current.id, { 
+        status: finalStatus, 
+        current_assignees_json: [], 
+        solved_at: ['solved', 'approved'].includes(finalStatus) ? new Date().toISOString() : undefined,
+        date_updated: new Date().toISOString() 
+      });
+    }
     nodeId = edge.target;
   }
   throw new Error('Workflow stopped after 50 automatic transitions; check for a loop in the canvas.');
