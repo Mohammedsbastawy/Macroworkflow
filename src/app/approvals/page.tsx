@@ -2,15 +2,23 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { fetchAllRequestsAction } from "@/app/actions/workflowActions";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function ApprovalsPage() {
+  const router = useRouter();
+  useEffect(() => {
+    // Route removed — redirect to consolidated Requests page
+    router.replace('/requests');
+  }, []);
+
   const { lang } = useLanguage();
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Keep backward compatible fetch (hidden behind redirect). This effect will usually not run because of the immediate redirect above.
     fetchAllRequestsAction().then((res) => {
       setRequests(res.requests || []);
       setLoading(false);

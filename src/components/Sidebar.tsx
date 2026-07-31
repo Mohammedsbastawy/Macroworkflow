@@ -27,8 +27,8 @@ const NAV_ITEMS: NavGroup[] = [
     items: [
       { href: "/", icon: "⊞", labelEn: "Dashboard", labelAr: "لوحة التحكم", moduleKey: "dashboard" },
       { href: "/requests/new", icon: "＋", labelEn: "New Request", labelAr: "طلب جديد", moduleKey: "newRequest" },
-      { href: "/requests", icon: "📋", labelEn: "My Requests", labelAr: "طلباتي", moduleKey: "myRequests" },
-      { href: "/approvals", icon: "✅", labelEn: "Pending Approvals", labelAr: "بانتظار الاعتماد", moduleKey: "pendingApprovals" },
+      { href: "/my-requests", icon: "👤", labelEn: "My Requests", labelAr: "طلباتي", moduleKey: "myRequests" },
+      { href: "/requests", icon: "📋", labelEn: "Requests", labelAr: "الطلبات", moduleKey: "requestsList" },
     ],
   },
   {

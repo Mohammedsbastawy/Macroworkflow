@@ -22,8 +22,7 @@ export interface DbUser {
 export async function getDbRoles(): Promise<DbRole[]> {
   return [
     { id: 'role-admin', name: 'Administrator', icon: 'verified_user', admin_access: true, app_access: true },
-    { id: 'role-approver', name: 'Approver Manager', icon: 'approval', admin_access: false, app_access: true },
-    { id: 'role-standard', name: 'Standard Employee', icon: 'person', admin_access: false, app_access: true },
+    { id: 'role-selfservice', name: 'Self-Service Employee', icon: 'person', admin_access: false, app_access: true },
   ];
 }
 
@@ -39,7 +38,7 @@ export async function getDbUsers(): Promise<DbUser[]> {
       first_name: u.name?.split(' ')[0] || u.name || '',
       last_name: u.name?.split(' ').slice(1).join(' ') || '',
       email: u.email || '',
-      role: u.role || 'role-standard',
+      role: u.role || 'role-selfservice',
       status: 'active'
     }));
   } catch (e) {

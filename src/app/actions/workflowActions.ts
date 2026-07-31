@@ -129,7 +129,7 @@ export async function submitWorkflowRequestAction(payload: {
   });
 
   revalidatePath('/requests');
-  revalidatePath('/approvals');
+  revalidatePath('/my-requests');
   revalidatePath('/');
   return { success: true, request: newRequest.request };
 }
@@ -147,7 +147,7 @@ export async function submitApprovalDecisionAction(payload: {
 
   revalidatePath('/requests');
   revalidatePath(`/requests/${payload.requestId}`);
-  revalidatePath('/approvals');
+  revalidatePath('/my-requests');
   revalidatePath('/');
   return { success: true, request: updatedRequest.request };
 }
@@ -196,6 +196,33 @@ export async function fetchAllRequestsAction() {
   const data = await getRequests();
   cachedRequests = { data, timestamp: now };
   return data;
+}
+
+/**
+ * Fetch requests where the given user is the requester (My Requests view)
+ */
+export async function fetchMyRequestsAction(userId?: string) {
+  const now = Date.now();
+  if (cachedRequests && now - cachedRequests.timestamp < CACHE_TTL_MS && userId == null) {
+    return cachedRequests.data;
+  }
+
+  // If userId provided, request filtered server-side by requesterId
+  const user = userId ? (await fetchSystemUsersAction()).find((u: any) => u.id === userId) || null : null;
+  const data = await getRequests({ requesterId: userId }, user || undefined);
+  return data;
+}
+
+/**
+ * Fetch requests where the given user is involved (assignee, approver, observer) but NOT the requester
+ */
+export async function fetchInvolvedRequestsAction(userId?: string) {
+  const users = await fetchSystemUsersAction();
+  const currentUser = userId ? users.find((u: any) => u.id === userId) || users[0] : users[0];
+  const all = await getRequests(undefined, currentUser);
+  // Filter out tickets created by the user (requester)
+  const requests = (all.requests || []).filter((r: any) => (r.requester_id || '').toLowerCase() !== (currentUser.id || '').toLowerCase());
+  return { ...all, requests };
 }
 
 export async function fetchRequestDetailAction(id: string, userId?: string) {
@@ -412,7 +439,7 @@ export async function deleteBusinessRuleAction(id: string) {
 }
 
 /**
- * Save Visual Canvas ReactFlow Graph (nodes, edges, steps) to database/PostgreSQL
+ * Save Visual Canvas ReactFlow Graph (nodes, edges, steps) to database/MySQL
  */
 export async function saveWorkflowCanvasGraphAction(payload: {
   workflowSlug: string;
@@ -443,7 +470,7 @@ export async function saveWorkflowCanvasGraphAction(payload: {
 }
 
 /**
- * Fetch Visual Canvas Graph for a Workflow from database/PostgreSQL
+ * Fetch Visual Canvas Graph for a Workflow from database/MySQL
  */
 export async function fetchWorkflowCanvasGraphAction(slug: string) {
   const { getWorkflowBySlug } = await import('@/lib/engine/workflowCore');
@@ -860,7 +887,7 @@ export async function saveSystemUserAction(payload: {
   email: string;
   department_id: string;
   group_ids: string[];
-  role: 'admin' | 'approver' | 'standard' | string;
+  role: 'admin' | 'selfservice' | string;
   avatar_initials: string;
   job_title?: string;
   direct_manager_id?: string;

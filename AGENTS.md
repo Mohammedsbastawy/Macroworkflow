@@ -21,7 +21,7 @@ Core Engine     (src/lib/engine/workflowCore.ts)
 Directus Client (src/lib/directus/client.ts)
         |
         v
-Directus REST API  --->  PostgreSQL Database
+Directus REST API  --->  MySQL Database
   http://localhost:8055
   Token: workflow-engine-admin-static-token-2026
 ```

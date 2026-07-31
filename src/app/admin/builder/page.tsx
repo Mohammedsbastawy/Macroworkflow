@@ -62,7 +62,7 @@ export default function WorkflowBuilderDirectoryPage() {
   const filtered = workflows.filter((w) => selectedCategory === "All" || w.category === selectedCategory);
 
   return (
-    <AuthGuard requiredModule="workflowBuilder" allowRoles={['admin', 'approver']}>
+    <AuthGuard requiredModule="workflowBuilder" allowRoles={['admin']}>
       {/* Page Header */}
       <div className="page-header">
         <div>

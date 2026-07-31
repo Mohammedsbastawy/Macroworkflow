@@ -36,7 +36,7 @@ export default function CatalogPage() {
     return () => window.removeEventListener("user-simulated-switch", handleUserSwitch);
   }, []);
 
-  const canManageCatalog = currentUser.role === "admin" || currentUser.role === "approver";
+  const canManageCatalog = currentUser.role === "admin";
 
   const handleClone = async (id: string) => {
     if (confirm("هل تريد استنساخ هذه الاستمارة لعمل نسخة جديدة؟")) {
@@ -64,7 +64,7 @@ export default function CatalogPage() {
   );
 
   return (
-    <AuthGuard requiredModule="workflowBuilder" allowRoles={["admin", "approver"]}>
+    <AuthGuard requiredModule="workflowBuilder" allowRoles={["admin"]}>
       {/* Header */}
       <div className="page-header">
         <div>

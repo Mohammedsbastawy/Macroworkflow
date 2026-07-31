@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { fetchInvolvedRequestsAction } from "@/app/actions/workflowActions";
+import { fetchMyRequestsAction } from "@/app/actions/workflowActions";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 type RequestItem = {
@@ -24,7 +24,7 @@ type SimulatedUser = {
   name?: string;
 };
 
-export default function RequestsPage() {
+export default function MyRequestsPage() {
   const { lang } = useLanguage();
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,11 +33,14 @@ export default function RequestsPage() {
 
   useEffect(() => {
     const load = async () => {
-      const savedId = typeof window !== 'undefined' ? localStorage.getItem('simulated_user_id') : null;
-      const savedUser = (typeof window !== 'undefined' && savedId) ? (JSON.parse(localStorage.getItem('system_user') || 'null') || null) : null;
+      const savedId = typeof window !== "undefined" ? localStorage.getItem("simulated_user_id") : null;
+      const savedUser =
+        typeof window !== "undefined" && savedId
+          ? JSON.parse(localStorage.getItem("system_user") || "null") || null
+          : null;
       setCurrentUser(savedUser);
 
-      const res = await fetchInvolvedRequestsAction(savedId || undefined);
+      const res = await fetchMyRequestsAction(savedId || undefined);
       setRequests((res.requests || []) as RequestItem[]);
       setLoading(false);
     };
@@ -79,14 +82,13 @@ export default function RequestsPage() {
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", paddingBottom: 60 }}>
-      {/* Page Header */}
       <div className="page-header" style={{ marginBottom: 20 }}>
         <div>
-          <h1 className="page-title">{lang === "ar" ? "الطلبات" : "Requests"}</h1>
+          <h1 className="page-title">{lang === "ar" ? "طلباتي" : "My Requests"}</h1>
           <p className="page-subtitle">
             {lang === "ar"
-              ? "استعرض الطلبات التي تشارك فيها كمراجع أو مسؤول متابعة"
-              : "Track requests where you are involved and take action where needed"}
+              ? "اعرض الطلبات التي قمت بتقديمها وتابع حالة كل منها"
+              : "Review all requests you created and track approval progress"}
           </p>
         </div>
         <Link href="/requests/new">
@@ -96,7 +98,6 @@ export default function RequestsPage() {
         </Link>
       </div>
 
-      {/* Filter Tabs */}
       <div
         style={{
           display: "flex",
@@ -129,7 +130,6 @@ export default function RequestsPage() {
         ))}
       </div>
 
-      {/* Content Section */}
       {loading ? (
         <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--color-text-muted)" }}>
           ⏳ {lang === "ar" ? "جاري تحميل الطلبات..." : "Loading requests..."}
@@ -138,10 +138,10 @@ export default function RequestsPage() {
         <div className="card empty-state" style={{ padding: "50px 20px" }}>
           <div className="empty-state-icon" style={{ fontSize: 40 }}>📄</div>
           <div style={{ fontWeight: 700, fontSize: 16, color: "var(--color-text-primary)", marginTop: 10 }}>
-            {lang === "ar" ? "لا توجد طلبات مرتبطة بك" : "No Involved Requests Found"}
+            {lang === "ar" ? "لا توجد طلبات قمت بتقديمها" : "No Submitted Requests Found"}
           </div>
           <div className="empty-state-text" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 4 }}>
-            {lang === "ar" ? "لم يتم ربطك بأي طلبات في هذا العرض بعد." : "You are not involved in any requests in this view yet."}
+            {lang === "ar" ? "لم تقدم أي طلبات بعد." : "You haven't submitted any requests yet."}
           </div>
           <div style={{ marginTop: 16 }}>
             <Link href="/requests/new">
@@ -151,10 +151,10 @@ export default function RequestsPage() {
         </div>
       ) : (
         <>
-          {/* 📱 DEDICATED MOBILE REQUEST CARDS (Visible on Mobile Screens) */}
           <div className="mobile-requests-list" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {filteredRequests.map((req) => {
-              const badge = getStatusBadge(String(req.status));
+              const reqAny = req as RequestItem;
+              const badge = getStatusBadge(String(reqAny.status));
               return (
                 <div
                   key={req.id}
@@ -206,7 +206,9 @@ export default function RequestsPage() {
                         {badge.label}
                       </span>
                       {currentUser && ((req.current_approver && String(req.current_approver).toLowerCase().includes((currentUser.id || '').toLowerCase())) || (Array.isArray(req.current_assignees_json) ? req.current_assignees_json : []).some((a) => String(a).toLowerCase().includes(String(currentUser?.id || "").toLowerCase()) || String(a).toLowerCase().includes(String(currentUser?.name || "").toLowerCase()))) && req.status === 'pending' ? (
-                        <span style={{ padding: '4px 8px', borderRadius: 12, background: '#FEF3C7', color: '#92400E', fontWeight: 800, fontSize: 11 }}>Action Required</span>
+                        <span style={{ padding: '4px 8px', borderRadius: 12, background: '#FEF3C7', color: '#92400E', fontWeight: 800, fontSize: 11 }}>
+                          {lang === "ar" ? "يتطلب إجراء" : "Action Required"}
+                        </span>
                       ) : null}
                     </div>
                   </div>
@@ -234,7 +236,6 @@ export default function RequestsPage() {
             })}
           </div>
 
-          {/* 💻 DESKTOP DATA TABLE (Visible on Larger Screens) */}
           <div className="card desktop-requests-table" style={{ overflow: "hidden", marginTop: 12 }}>
             <div className="table-wrap">
               <table className="table" style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -250,7 +251,8 @@ export default function RequestsPage() {
                 </thead>
                 <tbody>
                   {filteredRequests.map((req) => {
-                    const badge = getStatusBadge(String(req.status));
+                    const reqAny = req as RequestItem;
+                    const badge = getStatusBadge(String(reqAny.status));
                     return (
                       <tr key={req.id} style={{ borderBottom: "1px solid var(--color-border-light)" }}>
                         <td style={{ padding: 12, fontWeight: 700, color: "var(--color-primary)" }}>
@@ -275,7 +277,9 @@ export default function RequestsPage() {
                               {badge.label}
                             </span>
                             {currentUser && ((req.current_approver && String(req.current_approver).toLowerCase().includes((currentUser.id || '').toLowerCase())) || (Array.isArray(req.current_assignees_json) ? req.current_assignees_json : []).some((a) => String(a).toLowerCase().includes(String(currentUser?.id || "").toLowerCase()) || String(a).toLowerCase().includes(String(currentUser?.name || "").toLowerCase()))) && req.status === 'pending' ? (
-                              <span style={{ padding: '4px 8px', borderRadius: 12, background: '#FEF3C7', color: '#92400E', fontWeight: 800, fontSize: 11 }}>Action Required</span>
+                              <span style={{ padding: '4px 8px', borderRadius: 12, background: '#FEF3C7', color: '#92400E', fontWeight: 800, fontSize: 11 }}>
+                                {lang === "ar" ? "يتطلب إجراء" : "Action Required"}
+                              </span>
                             ) : null}
                           </div>
                         </td>
@@ -301,4 +305,6 @@ export default function RequestsPage() {
     </div>
   );
 }
+
+
 

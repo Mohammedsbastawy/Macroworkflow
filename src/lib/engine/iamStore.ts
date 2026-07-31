@@ -18,7 +18,7 @@ export interface SystemUser {
   email: string;
   department_id: string;
   group_ids: string[];
-  role: 'admin' | 'approver' | 'standard';
+  role: 'admin' | 'selfservice';
   avatar_initials: string;
   job_title?: string;
   direct_manager_id?: string;
@@ -40,7 +40,7 @@ export interface RolePermissionsConfig {
     catalog: boolean;
     newRequest: boolean;
     myRequests: boolean;
-    pendingApprovals: boolean;
+    requestsList: boolean;
     workflowBuilder: boolean;
     usersIam: boolean;
     profileSetup: boolean;
@@ -63,14 +63,14 @@ export interface RolePermissionsConfig {
 }
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, RolePermissionsConfig> = {
-  standard: {
+  selfservice: {
     ticketScope: "own",
     modules: {
       dashboard: true,
       catalog: true,
       newRequest: true,
       myRequests: true,
-      pendingApprovals: false,
+      requestsList: true,
       workflowBuilder: false,
       usersIam: false,
       profileSetup: false,
@@ -90,33 +90,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, RolePermissionsConfig> = {
       addPublicComment: true,
     },
   },
-  approver: {
-    ticketScope: "group",
-    modules: {
-      dashboard: true,
-      catalog: true,
-      newRequest: true,
-      myRequests: true,
-      pendingApprovals: true,
-      workflowBuilder: true,
-      usersIam: false,
-      profileSetup: false,
-      reportsSla: true,
-      settings: false,
-    },
-    actions: {
-      cancelRequest: true,
-      delegateApproval: true,
-      requestInfoRfi: true,
-      exportReports: true,
-      overrideOlaTimer: false,
-      approveTicket: true,
-      rejectTicket: true,
-      reassignTicket: true,
-      addInternalNote: true,
-      addPublicComment: true,
-    },
-  },
   admin: {
     ticketScope: "all",
     modules: {
@@ -124,7 +97,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, RolePermissionsConfig> = {
       catalog: true,
       newRequest: true,
       myRequests: true,
-      pendingApprovals: true,
+      requestsList: true,
       workflowBuilder: true,
       usersIam: true,
       profileSetup: true,
@@ -170,28 +143,28 @@ export const SYSTEM_USERS: SystemUser[] = [
   { id: 'user-admin', name: 'System Admin', email: 'admin@company.com', department_id: 'dept-it', group_ids: ['group-managers', 'group-executives'], role: 'admin', avatar_initials: 'AD', job_title: 'Infrastructure & System Super Admin', direct_manager_id: 'user-admin', unit: 'Corporate HQ' },
   
   // IT Department
-  { id: 'user-ahmed', name: 'Ahmed Mohamed (IT Staff)', email: 'ahmed@company.com', department_id: 'dept-it', group_ids: ['group-it-techs'], role: 'standard', avatar_initials: 'AM', job_title: 'IT Technical Support Specialist', direct_manager_id: 'user-khaled', unit: 'Enterprise IT Services' },
-  { id: 'user-khaled', name: 'Khaled Samir (IT Manager)', email: 'khaled@company.com', department_id: 'dept-it', group_ids: ['group-it-techs', 'group-managers'], role: 'approver', avatar_initials: 'KS', job_title: 'IT Department Director', direct_manager_id: 'user-mona', unit: 'Enterprise IT Services' },
+  { id: 'user-ahmed', name: 'Ahmed Mohamed (IT Staff)', email: 'ahmed@company.com', department_id: 'dept-it', group_ids: ['group-it-techs'], role: 'selfservice', avatar_initials: 'AM', job_title: 'IT Technical Support Specialist', direct_manager_id: 'user-khaled', unit: 'Enterprise IT Services' },
+  { id: 'user-khaled', name: 'Khaled Samir (IT Manager)', email: 'khaled@company.com', department_id: 'dept-it', group_ids: ['group-it-techs', 'group-managers'], role: 'selfservice', avatar_initials: 'KS', job_title: 'IT Department Director', direct_manager_id: 'user-mona', unit: 'Enterprise IT Services' },
   
   // Marketing & Branding Department
-  { id: 'user-noha', name: 'Noha Gamal (Marketing Specialist)', email: 'noha@company.com', department_id: 'dept-mkt', group_ids: ['group-mkt-team'], role: 'standard', avatar_initials: 'NG', job_title: 'Digital Marketing & Campaign Specialist', direct_manager_id: 'user-sherif', unit: 'Brand Gamma - Marketing Unit' },
-  { id: 'user-omar', name: 'Omar Khaled (Content & Design Lead)', email: 'omar@company.com', department_id: 'dept-mkt', group_ids: ['group-mkt-team'], role: 'standard', avatar_initials: 'OK', job_title: 'Content & Graphic Design Lead', direct_manager_id: 'user-sherif', unit: 'Brand Gamma - Marketing Unit' },
-  { id: 'user-sherif', name: 'Sherif Ramzy (Marketing Director)', email: 'sherif@company.com', department_id: 'dept-mkt', group_ids: ['group-mkt-team', 'group-managers'], role: 'approver', avatar_initials: 'SR', job_title: 'Marketing & Digital Branding Director', direct_manager_id: 'user-mona', unit: 'Brand Gamma - Marketing Unit' },
+  { id: 'user-noha', name: 'Noha Gamal (Marketing Specialist)', email: 'noha@company.com', department_id: 'dept-mkt', group_ids: ['group-mkt-team'], role: 'selfservice', avatar_initials: 'NG', job_title: 'Digital Marketing & Campaign Specialist', direct_manager_id: 'user-sherif', unit: 'Brand Gamma - Marketing Unit' },
+  { id: 'user-omar', name: 'Omar Khaled (Content & Design Lead)', email: 'omar@company.com', department_id: 'dept-mkt', group_ids: ['group-mkt-team'], role: 'selfservice', avatar_initials: 'OK', job_title: 'Content & Graphic Design Lead', direct_manager_id: 'user-sherif', unit: 'Brand Gamma - Marketing Unit' },
+  { id: 'user-sherif', name: 'Sherif Ramzy (Marketing Director)', email: 'sherif@company.com', department_id: 'dept-mkt', group_ids: ['group-mkt-team', 'group-managers'], role: 'selfservice', avatar_initials: 'SR', job_title: 'Marketing & Digital Branding Director', direct_manager_id: 'user-mona', unit: 'Brand Gamma - Marketing Unit' },
 
   // Procurement Department
-  { id: 'user-tarek', name: 'Tarek Hassan (Procurement Staff)', email: 'tarek@company.com', department_id: 'dept-procurement', group_ids: ['group-procurement'], role: 'standard', avatar_initials: 'TH', job_title: 'Senior Purchasing Officer', direct_manager_id: 'user-yasser', unit: 'Brand Alpha - Retail Unit' },
-  { id: 'user-yasser', name: 'Yasser Mahmoud (Procurement Manager)', email: 'yasser@company.com', department_id: 'dept-procurement', group_ids: ['group-procurement', 'group-managers'], role: 'approver', avatar_initials: 'YM', job_title: 'Head of Procurement', direct_manager_id: 'user-mona', unit: 'Brand Alpha - Retail Unit' },
+  { id: 'user-tarek', name: 'Tarek Hassan (Procurement Staff)', email: 'tarek@company.com', department_id: 'dept-procurement', group_ids: ['group-procurement'], role: 'selfservice', avatar_initials: 'TH', job_title: 'Senior Purchasing Officer', direct_manager_id: 'user-yasser', unit: 'Brand Alpha - Retail Unit' },
+  { id: 'user-yasser', name: 'Yasser Mahmoud (Procurement Manager)', email: 'yasser@company.com', department_id: 'dept-procurement', group_ids: ['group-procurement', 'group-managers'], role: 'selfservice', avatar_initials: 'YM', job_title: 'Head of Procurement', direct_manager_id: 'user-mona', unit: 'Brand Alpha - Retail Unit' },
 
   // Finance & Accounts Department
-  { id: 'user-huda', name: 'Huda Adel (Accounts Staff)', email: 'huda@company.com', department_id: 'dept-finance', group_ids: ['group-finance'], role: 'standard', avatar_initials: 'HA', job_title: 'Senior Financial Accountant', direct_manager_id: 'user-mona', unit: 'Brand Beta - E-Commerce Unit' },
-  { id: 'user-mona', name: 'Mona Omar (Finance Manager / CFO)', email: 'mona@company.com', department_id: 'dept-finance', group_ids: ['group-finance', 'group-procurement', 'group-managers', 'group-executives'], role: 'approver', avatar_initials: 'MO', job_title: 'Chief Financial Officer (CFO)', direct_manager_id: 'user-admin', unit: 'Corporate HQ' },
+  { id: 'user-huda', name: 'Huda Adel (Accounts Staff)', email: 'huda@company.com', department_id: 'dept-finance', group_ids: ['group-finance'], role: 'selfservice', avatar_initials: 'HA', job_title: 'Senior Financial Accountant', direct_manager_id: 'user-mona', unit: 'Brand Beta - E-Commerce Unit' },
+  { id: 'user-mona', name: 'Mona Omar (Finance Manager / CFO)', email: 'mona@company.com', department_id: 'dept-finance', group_ids: ['group-finance', 'group-procurement', 'group-managers', 'group-executives'], role: 'selfservice', avatar_initials: 'MO', job_title: 'Chief Financial Officer (CFO)', direct_manager_id: 'user-admin', unit: 'Corporate HQ' },
 
   // HR Department
-  { id: 'user-laila', name: 'Laila Ibrahim (HR Staff)', email: 'laila@company.com', department_id: 'dept-hr', group_ids: [], role: 'standard', avatar_initials: 'LI', job_title: 'HR Specialist', direct_manager_id: 'user-sara', unit: 'Brand Gamma - Marketing Unit' },
-  { id: 'user-sara', name: 'Sara Hassan (HR Director)', email: 'sara@company.com', department_id: 'dept-hr', group_ids: ['group-managers'], role: 'approver', avatar_initials: 'SH', job_title: 'Director of Human Resources', direct_manager_id: 'user-mona', unit: 'Brand Gamma - Marketing Unit' },
+  { id: 'user-laila', name: 'Laila Ibrahim (HR Staff)', email: 'laila@company.com', department_id: 'dept-hr', group_ids: [], role: 'selfservice', avatar_initials: 'LI', job_title: 'HR Specialist', direct_manager_id: 'user-sara', unit: 'Brand Gamma - Marketing Unit' },
+  { id: 'user-sara', name: 'Sara Hassan (HR Director)', email: 'sara@company.com', department_id: 'dept-hr', group_ids: ['group-managers'], role: 'selfservice', avatar_initials: 'SH', job_title: 'Director of Human Resources', direct_manager_id: 'user-mona', unit: 'Brand Gamma - Marketing Unit' },
 
   // Operations Department
-  { id: 'user-karim', name: 'Karim Fathy (Operations Manager)', email: 'karim@company.com', department_id: 'dept-ops', group_ids: ['group-managers'], role: 'approver', avatar_initials: 'KF', job_title: 'Operations & Facilities Manager', direct_manager_id: 'user-mona', unit: 'Brand Delta - Operations Unit' },
+  { id: 'user-karim', name: 'Karim Fathy (Operations Manager)', email: 'karim@company.com', department_id: 'dept-ops', group_ids: ['group-managers'], role: 'selfservice', avatar_initials: 'KF', job_title: 'Operations & Facilities Manager', direct_manager_id: 'user-mona', unit: 'Brand Delta - Operations Unit' },
 ];
 
 export const SEEDED_WORKFLOWS: any[] = [];

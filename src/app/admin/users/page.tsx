@@ -31,7 +31,7 @@ export default function UsersIamPage() {
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [userDept, setUserDept] = useState("dept-it");
-  const [userRole, setUserRole] = useState<"admin" | "approver" | "standard">("standard");
+  const [userRole, setUserRole] = useState<"admin" | "selfservice">("selfservice");
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
 
   // Add Dept Modal State
@@ -243,7 +243,7 @@ export default function UsersIamPage() {
                         </div>
                       </td>
                       <td>
-                        <span className={`badge ${u.role === "admin" ? "urgent" : u.role === "approver" ? "info" : "draft"}`}>
+                        <span className={`badge ${u.role === "admin" ? "urgent" : "draft"}`}>
                           {u.role.toUpperCase()}
                         </span>
                       </td>
@@ -344,8 +344,7 @@ export default function UsersIamPage() {
                   <div className="form-group">
                     <label className="form-label">IAM Role</label>
                     <select className="form-control" value={userRole} onChange={(e) => setUserRole(e.target.value as any)}>
-                      <option value="standard">Standard Employee</option>
-                      <option value="approver">Approver / Manager</option>
+                      <option value="selfservice">Self-Service Employee</option>
                       <option value="admin">System Admin</option>
                     </select>
                   </div>

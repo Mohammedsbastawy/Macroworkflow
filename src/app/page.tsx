@@ -6,11 +6,15 @@ import { fetchAllRequestsAction } from "@/app/actions/workflowActions";
 import { SYSTEM_USERS, SystemUser } from "@/lib/engine/iamStore";
 import { SimplifiedPortal } from "@/components/portal/SimplifiedPortal";
 
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+
 export default function HomeDashboardPage() {
   const [mounted, setMounted] = useState(false);
   const [currentUser, setCurrentUser] = useState<SystemUser>(SYSTEM_USERS[0]);
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  // Hooks must be called unconditionally — move i18n hook near the top to avoid changing hook order across renders
+  const { t } = useLanguage();
 
   const loadData = async () => {
     try {
@@ -51,12 +55,12 @@ export default function HomeDashboardPage() {
     );
   }
 
-  // Standard Employees get the Simplified Self-Service Portal View!
-  if (currentUser.role === "standard") {
+  // Self-service Employees get the Simplified Self-Service Portal View!
+  if (currentUser.role === "selfservice") {
     return <SimplifiedPortal />;
   }
 
-  // Admin & Approvers get the Full Enterprise Analytics Dashboard
+  // Admin users get the Full Enterprise Analytics Dashboard
   const pendingApprovals = requests.filter((r) => r.status === "pending" || r.status === "pending_info");
   const approvedTotal = requests.filter((r) => r.status === "approved" || r.status === "solved").length;
   const totalCount = requests.length;
@@ -95,7 +99,7 @@ export default function HomeDashboardPage() {
           <div className="kpi-icon amber">⏱</div>
           <div className="kpi-body">
             <div className="kpi-value">{pendingApprovals.length}</div>
-            <div className="kpi-label">Pending Approvals</div>
+            <div className="kpi-label">Requests Awaiting Action</div>
           </div>
         </div>
 
@@ -117,50 +121,50 @@ export default function HomeDashboardPage() {
       </div>
 
       {/* Main Content Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20, marginTop: 24 }}>
+      <div className="main-grid">
         {/* Pending Approvals Table */}
         <div className="card">
           <div className="card-header">
-            <div className="card-title">⚡ Pending Approvals Requiring Action</div>
-            <Link href="/approvals">
+            <div className="card-title">{t('requests','requests','الطلبات')}</div>
+            <Link href="/requests">
               <button className="btn btn-ghost btn-sm">View All →</button>
             </Link>
           </div>
           <div className="table-wrap">
-            <table>
+            <table className="responsive-table">
               <thead>
                 <tr>
-                  <th>Ticket ID</th>
-                  <th>Title & Requester</th>
-                  <th>Priority</th>
-                  <th>Status</th>
-                  <th>Action</th>
+                  <th>{t('hdrTicketId','Ticket ID','معرّف التذكرة')}</th>
+                  <th>{t('hdrTitleRequester','Title & Requester','العنوان والمُقدّم')}</th>
+                  <th>{t('hdrPriority','Priority','الأولوية')}</th>
+                  <th>{t('hdrStatus','Status','الحالة')}</th>
+                  <th>{t('hdrAction','Action','إجراء')}</th>
                 </tr>
               </thead>
               <tbody>
                 {pendingApprovals.length === 0 ? (
                   <tr>
                     <td colSpan={5} style={{ textAlign: "center", padding: 30, color: "var(--color-text-muted)" }}>
-                      🎉 No pending approval requests in your queue.
+                      🎉 {t('noPending','No pending approval requests in your queue.','لا توجد طلبات انتظار في قائمة الاعتماد الخاصة بك.')}
                     </td>
                   </tr>
                 ) : (
                   pendingApprovals.slice(0, 5).map((req) => (
                     <tr key={req.id}>
-                      <td style={{ fontWeight: 700 }}>{req.request_number}</td>
-                      <td>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{req.title}</div>
-                        <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{req.requester_id}</div>
+                      <td data-label={t('hdrTicketId','Ticket ID','معرّف التذكرة')} className="td-req-number">{req.request_number}</td>
+                      <td data-label={t('hdrTitleRequester','Title & Requester','العنوان والمُقدّم')}>
+                        <div className="td-title" style={{ fontWeight: 600, fontSize: 13 }}>{req.title}</div>
+                        <div className="td-sub" style={{ fontSize: 11 }}>{req.requester_id}</div>
                       </td>
-                      <td>
+                      <td data-label={t('hdrPriority','Priority','الأولوية')}>
                         <span className="badge urgent">{req.priority}</span>
                       </td>
-                      <td>
+                      <td data-label={t('hdrStatus','Status','الحالة')}>
                         <span className={`badge ${req.status}`}>{req.status}</span>
                       </td>
-                      <td>
+                      <td data-label={t('hdrAction','Action','إجراء')} className="td-actions">
                         <Link href={`/requests/${req.id}`}>
-                          <button className="btn btn-primary btn-sm">Review →</button>
+                          <button className="btn btn-primary btn-sm">{t('btnReview','Review →','عرض')}</button>
                         </Link>
                       </td>
                     </tr>

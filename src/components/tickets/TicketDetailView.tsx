@@ -118,10 +118,10 @@ export function TicketDetailView({
     try {
       const { fetchRolePermissionsAction } = await import("@/app/actions/workflowActions");
       const dbPerms = await fetchRolePermissionsAction();
-      const perm = dbPerms?.[u.role] || DEFAULT_ROLE_PERMISSIONS[u.role] || DEFAULT_ROLE_PERMISSIONS.standard;
+      const perm = dbPerms?.[u.role] || DEFAULT_ROLE_PERMISSIONS[u.role] || DEFAULT_ROLE_PERMISSIONS.selfservice;
       setUserPermissions(perm);
     } catch (e) {
-      const perm = DEFAULT_ROLE_PERMISSIONS[u.role] || DEFAULT_ROLE_PERMISSIONS.standard;
+      const perm = DEFAULT_ROLE_PERMISSIONS[u.role] || DEFAULT_ROLE_PERMISSIONS.selfservice;
       setUserPermissions(perm);
     }
   };
@@ -284,12 +284,12 @@ export function TicketDetailView({
               💡 Request For Information (RFI) Pending Answer
             </div>
             <p style={{ fontSize: 12, color: "#B45309", marginBottom: 12 }}>
-              Approvers have requested additional details. The OLA clock is currently <strong>PAUSED</strong> until you answer below.
+              A reviewer has requested additional details. The OLA clock is currently <strong>PAUSED</strong> until you answer below.
             </p>
             <div style={{ display: "flex", gap: 10 }}>
               <input
                 className="form-control"
-                placeholder="Type your response to the approver's question..."
+                placeholder={isAr ? "اكتب إجابتك على سؤال المراجع..." : "Type your response to the reviewer's question..."}
                 value={rfiAnswer}
                 onChange={(e) => setRfiAnswer(e.target.value)}
               />
@@ -479,7 +479,7 @@ export function TicketDetailView({
                     ⚡ Available Actions for: <strong style={{ color: "var(--color-primary)" }}>{currentUser.name}</strong> ({currentUser.role.toUpperCase()})
                   </span>
                   <span className="tag" style={{ fontSize: 10 }}>
-                    Role: {currentUser.role === "admin" ? "👑 System Admin" : currentUser.role === "approver" ? "🛡️ Approver / Manager" : "👤 Requester Employee"}
+                    Role: {currentUser.role === "admin" ? "👑 System Admin" : currentUser.role === "selfservice" ? "👤 Self-Service Employee" : "👤 Requester Employee"}
                   </span>
                 </div>
                 {hasAnyAction ? (
@@ -644,7 +644,7 @@ export function TicketDetailView({
                 <textarea
                   className="form-control"
                   rows={2}
-                  placeholder={isInternalNote ? "Write an internal note (Visible ONLY to Approvers & Admins)..." : "Add a public comment to requester..."}
+                  placeholder={isInternalNote ? "Write an internal note (Visible ONLY to assigned reviewers & Admins)..." : "Add a public comment to requester..."}
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                 />
@@ -656,7 +656,7 @@ export function TicketDetailView({
                         checked={isInternalNote}
                         onChange={(e) => setIsInternalNote(e.target.checked)}
                       />
-                      🔒 Internal Note (Approvers Only)
+                      🔒 Internal Note (Reviewers & Admins)
                     </label>
                   )}
                   <button className="btn btn-primary btn-sm" onClick={handlePostComment} style={{ marginLeft: "auto" }}>
@@ -669,8 +669,8 @@ export function TicketDetailView({
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {timelineItems.map((item: any) => {
                   const isInternal = item.is_internal || item.action === "internal_note";
-                  // Hide internal notes from standard users
-                  if (isInternal && currentUser.role === "standard") return null;
+                  // Hide internal notes from self-service users
+                  if (isInternal && currentUser.role === "selfservice") return null;
 
                   return (
                     <div
@@ -751,7 +751,7 @@ export function TicketDetailView({
 
                         <div>
                           <div style={{ fontSize: 10, color: "var(--color-text-muted)", fontWeight: 700 }}>Priority</div>
-                          <span className="badge urgent" style={{ marginTop: 2, fontSize: 10 }}>{(values?.["glpi_urgency"] || request.priority || 'normal').toUpperCase()}</span>
+                           <span className="badge urgent" style={{ marginTop: 2, fontSize: 10 }}>{(request.priority || values?.["glpi_urgency"] || 'normal').toUpperCase()}</span>
                         </div>
 
                         <div>
@@ -814,9 +814,9 @@ export function TicketDetailView({
                       </div>
 
                       <div style={{ marginBottom: 8 }}>
-                        <div style={{ fontSize: 10, color: "var(--color-text-muted)", fontWeight: 700 }}>Assigned Technician / Approver</div>
+                        <div style={{ fontSize: 10, color: "var(--color-text-muted)", fontWeight: 700 }}>Assigned Technician / Reviewer</div>
                         <div style={{ fontSize: 12, fontWeight: 700, color: "#059669", marginTop: 2 }}>
-                          👤 {request.assigned_user || request.current_approver || "Khaled Samir (Manager)"}
+                          👤 {request.assigned_user || (request.current_assignees_json && request.current_assignees_json.length > 0 ? request.current_assignees_json.join(', ') : "Unassigned")}
                         </div>
                       </div>
 

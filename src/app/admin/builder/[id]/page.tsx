@@ -32,7 +32,7 @@ export default function DedicatedWorkflowCanvasPage({ params }: { params: Promis
   }
 
   return (
-    <AuthGuard requiredModule="workflowBuilder" allowRoles={['admin', 'approver']}>
+    <AuthGuard requiredModule="workflowBuilder" allowRoles={['admin']}>
       <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 70px)", margin: "-24px" }}>
         {/* Header bar for specific workflow */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 24px", background: "var(--color-surface)", borderBottom: "1px solid var(--color-border)" }}>

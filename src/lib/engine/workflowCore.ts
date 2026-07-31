@@ -18,6 +18,7 @@ import {
   dbDelete,
 } from './store';
 import { WorkflowStep, WorkflowFormField, WorkflowRequest, ApprovalLogEntry } from '@/types/workflow';
+import { continueGraphWorkflow, startGraphWorkflow } from './workflowRuntime';
 
 // ============================================================
 //  Workflow Template CRUD
@@ -262,6 +263,80 @@ export function canUserAccessTicket(
 // ============================================================
 
 /**
+ * Helpers: ticket requester / involved checks and observer persistence
+ */
+export function isTicketRequester(ticket: WorkflowRequest, userIdOrIdentifier?: string | null): boolean {
+  if (!userIdOrIdentifier) return false;
+  const uid = (userIdOrIdentifier || '').toLowerCase();
+  const reqId = (ticket.requester_id || '').toLowerCase();
+  const reqName = (ticket.requester_name || '').toLowerCase();
+  return uid === reqId || uid === reqName;
+}
+
+export function isTicketInvolved(ticket: WorkflowRequest, user: { id?: string; name?: string; email?: string; role?: string } | string | null): boolean {
+  if (!user) return false;
+  const userId = typeof user === 'string' ? user.toLowerCase() : (user.id || '').toLowerCase();
+  const userEmail = typeof user === 'string' ? user.toLowerCase() : (user.email || '').toLowerCase();
+  const userName = typeof user === 'string' ? user.toLowerCase() : (user.name || '').toLowerCase();
+
+  const assignees = (ticket.current_assignees_json || []).map((a) => String(a).toLowerCase());
+  if (assignees.some((a) => a && (a.includes(userId) || a.includes(userEmail) || a.includes(userName)))) return true;
+
+  const assignedUser = (ticket.assigned_user || '').toLowerCase();
+  if (assignedUser && (assignedUser === userId || assignedUser === userEmail || assignedUser === userName)) return true;
+
+  const currentApprover = (ticket.current_approver || '').toLowerCase();
+  if (currentApprover && (currentApprover === userId || currentApprover === userEmail || currentApprover === userName)) return true;
+
+  const observers = (ticket.observer_id || '').toLowerCase();
+  if (observers && (userId && observers.includes(userId) || userEmail && observers.includes(userEmail) || userName && observers.includes(userName))) return true;
+
+  return false;
+}
+
+/**
+ * Persist observer entries into normalized ticket_observers table and update legacy observer_id string
+ */
+export async function addObserversToTicket(ticketId: string, observerIdentifiers: string[]) {
+  if (!ticketId) return;
+  const uniq = Array.from(new Set((observerIdentifiers || []).map((s) => String(s).trim()).filter(Boolean)));
+  if (uniq.length === 0) return;
+
+  // Insert each observer if not exists
+  for (const obs of uniq) {
+    try {
+      const existing = await dbGet('ticket_observers', { ticket_id: { _eq: ticketId }, user_id: { _eq: obs } }, undefined, 1);
+      if (!existing || existing.length === 0) {
+        await dbCreate('ticket_observers', {
+          id: `to_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          ticket_id: ticketId,
+          user_id: obs,
+          added_at: new Date().toISOString(),
+        });
+      }
+    } catch (e) {
+      // non-fatal
+      console.warn('[addObserversToTicket insert error]', e);
+    }
+  }
+
+  // Rebuild legacy comma-separated observer_id field for backward compatibility
+  try {
+    const rows = await dbGet('ticket_observers', { ticket_id: { _eq: ticketId } });
+    const ids = (rows || []).map((r: any) => String(r.user_id)).filter(Boolean);
+    const joined = ids.join(', ');
+    try {
+      await dbUpdate('tickets', ticketId, { observer_id: joined, date_updated: new Date().toISOString() });
+    } catch (e) {
+      // ignore
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+
+/**
  * Submit a new request (ticket) — creates ticket + EAV field values + audit log.
  * Automatically adds assigned Approvers to observer_id so they become watchers!
  */
@@ -394,8 +469,26 @@ export async function submitRequest(params: {
 
   const createdLog = await dbCreate('approval_log', logPayload);
 
+  // A visual workflow is a graph, not an ordered list. Traverse its trigger and
+  // automatic nodes now, stopping only when an approval node needs a human.
+  const runtime = await startGraphWorkflow(createdTicket, wf, finalEavMap);
+  const runtimeTicket = runtime.handled ? runtime.ticket : createdTicket;
+
+  // Persist initial observers to normalized ticket_observers table (if any)
+  const initialObservers: string[] = [];
+  if (defaultObservers) {
+    initialObservers.push(...defaultObservers.split(',').map(s => s.trim()).filter(Boolean));
+  }
+
+  try {
+    await addObserversToTicket(runtimeTicket.id || ticketId, initialObservers);
+  } catch (e) {
+    // Non-fatal — observer persistence should not block ticket creation
+    console.warn('[addObserversToTicket failed]', e);
+  }
+
   return {
-    request: normalizeTicket(createdTicket),
+    request: normalizeTicket(runtimeTicket),
     log: normalizeApprovalLog(createdLog),
   };
 }
@@ -549,6 +642,27 @@ export async function processApprovalAction(params: {
     ticket = byNumber[0];
   }
 
+  // Use the persisted canvas graph when available. Older workflows without a
+  // graph continue through the legacy ordered-step engine below.
+  const graphWorkflow = await dbGetOne<any>('workflows', ticket.workflow_id);
+  if (graphWorkflow) {
+    const runtime = await continueGraphWorkflow(ticket, graphWorkflow, params.action);
+    if (runtime.handled) {
+      const log = await dbCreate('approval_log', {
+        id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        ticket_id: ticket.id,
+        step_node_id: runtime.ticket.current_step_node_id,
+        step_order_snapshot: runtime.ticket.current_step_order,
+        actor_id: params.actorName || 'Approver',
+        actor_name: params.actorName || 'Approver',
+        action: params.action,
+        comments: params.comments || `Action ${params.action} recorded.`,
+        decision_at: new Date().toISOString(),
+      });
+      return { request: normalizeTicket(runtime.ticket), log: normalizeApprovalLog(log) };
+    }
+  }
+
   const steps = ticket.workflow_snapshot_json || [];
   const currentStepIdx = steps.findIndex(
     (s: any) => s.react_flow_node_id === ticket.current_step_node_id || s.step_order === ticket.current_step_order
@@ -623,6 +737,14 @@ export async function processApprovalAction(params: {
   };
 
   const createdLog = await dbCreate('approval_log', logPayload);
+
+
+  // Persist actor and new assignees as observers for normalized queries
+  try {
+    await addObserversToTicket(updatedTicket.id, Array.from(new Set([String(params.actorName), ...(newAssignees || [])])));
+  } catch (e) {
+    console.warn('[addObserversToTicket after approval failed]', e);
+  }
 
   return {
     request: normalizeTicket(updatedTicket),

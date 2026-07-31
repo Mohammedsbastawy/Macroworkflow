@@ -297,7 +297,7 @@ export default function BusinessRulesManagerPage() {
   };
 
   return (
-    <AuthGuard requiredModule="workflowBuilder" allowRoles={['admin', 'approver']}>
+    <AuthGuard requiredModule="workflowBuilder" allowRoles={['admin']}>
       {/* Page Header */}
       <div className="page-header">
         <div>

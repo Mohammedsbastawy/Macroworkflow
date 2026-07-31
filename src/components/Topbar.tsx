@@ -6,9 +6,9 @@ import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 const ROUTE_LABELS: Record<string, { breadcrumb: string[]; titleEn: string; titleAr: string }> = {
   "/": { breadcrumb: [], titleEn: "Dashboard", titleAr: "لوحة التحكم" },
-  "/requests": { breadcrumb: ["Requests"], titleEn: "My Requests", titleAr: "طلباتي" },
+  "/requests": { breadcrumb: ["Requests"], titleEn: "Requests", titleAr: "الطلبات" },
+  "/my-requests": { breadcrumb: ["Requests"], titleEn: "My Requests", titleAr: "طلباتي" },
   "/requests/new": { breadcrumb: ["Requests"], titleEn: "New Request", titleAr: "طلب جديد" },
-  "/approvals": { breadcrumb: [], titleEn: "Pending Approvals", titleAr: "الطلبات بانتظار الاعتماد" },
   "/workflows": { breadcrumb: [], titleEn: "Requests Catalog Editor", titleAr: "محرر كتالوج الطلبات" },
   "/workflows/form-builder": { breadcrumb: ["Requests Catalog Editor"], titleEn: "Form Builder", titleAr: "مصمم الاستمارات" },
   "/admin/builder": { breadcrumb: ["Workflows"], titleEn: "Workflow & Rules Builder", titleAr: "مصمم المسارات وقواعد العمل" },
@@ -272,8 +272,8 @@ export function Topbar() {
                         borderRadius: 8,
                         fontSize: 10,
                         fontWeight: 800,
-                        background: u.role === "admin" ? "#FEF3C7" : u.role === "approver" ? "#ECFDF5" : "#F3F4F6",
-                        color: u.role === "admin" ? "#92400E" : u.role === "approver" ? "#065F46" : "#374151",
+                        background: u.role === "admin" ? "#FEF3C7" : "#F3F4F6",
+                        color: u.role === "admin" ? "#92400E" : "#374151",
                       }}
                     >
                       {u.role.toUpperCase()}

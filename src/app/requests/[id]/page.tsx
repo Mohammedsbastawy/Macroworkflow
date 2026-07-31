@@ -83,7 +83,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
         <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: "12px auto 20px", maxWidth: 500, lineHeight: 1.6 }}>
           المحاولة مرفوضة أمنياً! الموظف الحالي (<strong>{activeUser.name}</strong>) ليس لديه صلاحية مشاهدة هذه التذكرة.
           <br />
-          وفقاً لمعايير الأمان، يُسمح بالوصول فقط لـ: <strong>مقدم الطلب (Requester)</strong>، <strong>الفني/المعتمد (Assigned Approver)</strong>، <strong>المُتابع (Observer)</strong>، أو <strong>أدمن النظام (Admin)</strong>.
+          وفقاً لمعايير الأمان، يُسمح بالوصول فقط لـ: <strong>مقدم الطلب (Requester)</strong>، <strong>الفني/المراجع (Assigned Reviewer)</strong>، <strong>المُتابع (Observer)</strong>، أو <strong>أدمن النظام (Admin)</strong>.
         </p>
         <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
           <Link href="/requests">

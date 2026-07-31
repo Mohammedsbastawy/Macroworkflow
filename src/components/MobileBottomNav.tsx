@@ -42,14 +42,14 @@ export function MobileBottomNav() {
     {
       href: "/requests",
       icon: "📋",
-      labelEn: "My Requests",
-      labelAr: "طلباتي",
+      labelEn: "Requests",
+      labelAr: "الطلبات",
     },
     {
-      href: "/approvals",
-      icon: "✅",
-      labelEn: "Approvals",
-      labelAr: "الاعتمادات",
+      href: "/my-requests",
+      icon: "👤",
+      labelEn: "My Requests",
+      labelAr: "طلباتي",
     },
     {
       href: currentUser.role === "admin" ? "/admin/users" : "/portal",

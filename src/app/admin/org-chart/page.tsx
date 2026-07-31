@@ -66,7 +66,7 @@ export default function OrgChartPage() {
           {/* SUB-DEPARTMENTS LEVEL GRID */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, width: "100%" }}>
             {childDepts.map((dept) => {
-              const deptManager = SYSTEM_USERS.find((u) => u.id === dept.head_user_id || u.department_id === dept.id && u.role === "approver");
+              const deptManager = SYSTEM_USERS.find((u) => u.id === dept.head_user_id || u.department_id === dept.id);
               const deptStaff = SYSTEM_USERS.filter((u) => u.department_id === dept.id);
 
               return (

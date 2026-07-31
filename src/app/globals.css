@@ -271,7 +271,70 @@ input, select, textarea { font-family: inherit; }
 }
 
 /* ─── Table ─────────────────────────────────────────────── */
-.table-wrap { overflow-x: auto; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 12px; } /* allow touch scrolling and space for mobile nav */
+
+/* Ensure tables remain usable on small screens: force a reasonable min width so action column stays visible and table can be scrolled horizontally */
+.card .table-wrap table { min-width: 720px; } 
+
+@media (min-width: 900px) {
+  /* on larger screens let table be fluid */
+  .card .table-wrap table { min-width: 0; }
+}
+
+/* Responsive: stacked rows on small screens (mobile) */
+@media (max-width: 720px) {
+  .card .table-wrap table.responsive-table,
+  .card .table-wrap thead,
+  .card .table-wrap tbody,
+  .card .table-wrap th,
+  .card .table-wrap td,
+  .card .table-wrap tr {
+    display: block;
+    width: 100%;
+  }
+
+  .card .table-wrap thead { display: none; }
+
+  .card .table-wrap tbody tr {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .card .table-wrap td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border: none;
+  }
+
+  .card .table-wrap td[data-label]::before {
+    content: attr(data-label);
+    display: inline-block;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    width: 40%;
+    flex-shrink: 0;
+    padding-right: 12px;
+  }
+
+  .card .table-wrap td .btn { padding: 6px 8px; font-size: 12px; }
+
+  /* Make sure the request number stands out and wraps correctly */
+  .card .table-wrap .td-req-number { font-weight: 700; font-family: monospace; font-size: 13px; }
+
+  /* Align title area to use remaining space */
+  .card .table-wrap .td-title { flex: 1; text-align: left; }
+  .card .table-wrap .td-sub { text-align: left; color: var(--color-text-muted); }
+
+  /* Reduce badge/pill sizes on mobile */
+  .card .table-wrap .badge { font-size: 11px; padding: 4px 8px; }
+}
+
 table { width: 100%; border-collapse: collapse; }
 thead th {
   text-align: left; font-size: 11px; font-weight: 600;
@@ -678,6 +741,175 @@ tbody td { padding: 12px 16px; font-size: 13px; }
   margin-left: auto;
 }
 
+/* Main grid for dashboard (desktop: 2fr / 1fr). Use class so we can change stacking behavior on mobile cleanly */
+.main-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  margin-top: 24px;
+}
+
+@media (max-width: 768px) {
+  .mobile-hamburger-btn {
+    display: flex !important;
+  }
+
+  .mobile-sidebar-close-btn {
+    display: flex !important;
+  }
+
+  /* App shell layout stack */
+  .app-shell {
+    flex-direction: column !important;
+  }
+
+  /* Mobile Drawer Sidebar */
+  .sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    z-index: 1000 !important;
+    width: 260px !important;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  [dir="rtl"] .sidebar {
+    left: auto !important;
+    right: 0 !important;
+    transform: translateX(100%);
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0) !important;
+  }
+
+  .sidebar-backdrop {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: rgba(15, 23, 42, 0.6) !important;
+    z-index: 999 !important;
+    touch-action: manipulation;
+  }
+
+  /* Main content full screen on mobile */
+  .main-content {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Make page content padding smaller horizontally but keep bottom padding to account for mobile bottom nav */
+  .page-content {
+    padding: 12px 10px 96px 10px !important; /* bottom padding increased so fixed bottom nav doesn't overlap cards */
+  }
+
+  .topbar {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+  }
+
+  .topbar-left {
+    gap: 8px !important;
+  }
+
+  .topbar-breadcrumb {
+    font-size: 11px !important;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .desktop-only {
+    display: none !important;
+  }
+
+  .mobile-only-user-btn {
+    display: flex !important;
+  }
+
+  .topbar-title-text {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Grids & Cards responsive stack */
+  .detail-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  /* Stack the dashboard main grid into a single column on phones so Requests appear above Quick Actions */
+  .main-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Make cards full width inside the main grid */
+  .main-grid .card {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Ensure table-wrap and cards don't overflow horizontally */
+  .card .table-wrap {
+    overflow-x: visible !important;
+    padding-bottom: 8px !important;
+  }
+
+  .card .table-wrap table {
+    min-width: 0 !important;
+    width: 100% !important;
+    table-layout: fixed !important;
+  }
+
+  /* Make action buttons more compact but visible */
+  .card .table-wrap td.td-actions .btn {
+    min-width: 72px !important;
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+  }
+
+  /* Reduce KPI grid columns on small screens */
+  .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+.mobile-hamburger-btn {
+  display: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--color-text-primary);
+  flex-shrink: 0;
+}
+
+.mobile-sidebar-close-btn {
+  display: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  margin-left: auto;
+}
+
 @media (max-width: 768px) {
   .mobile-hamburger-btn {
     display: flex !important;
@@ -914,6 +1146,48 @@ tbody td { padding: 12px 16px; font-size: 13px; }
     display: none !important;
   }
 }
+
+/* Mobile table overrides to prevent horizontal overflow and ensure stacked cards fit screen */
+@media (max-width: 768px) {
+  /* Ensure tables don't force parent width */
+  .card .table-wrap table {
+    min-width: 0 !important;
+    width: 100% !important;
+    table-layout: fixed !important;
+  }
+
+  /* Allow stacked rows to fit and prevent scroll off-screen */
+  .card .table-wrap {
+    overflow-x: visible !important;
+    padding-bottom: 8px !important;
+  }
+
+  /* Tweak label width to avoid overflow */
+  .card .table-wrap td[data-label]::before {
+    width: 38% !important;
+    max-width: 38% !important;
+    box-sizing: border-box !important;
+    white-space: normal !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .card .table-wrap td {
+    gap: 8px;
+  }
+
+  /* Make action button full width to keep it visible */
+  .card .table-wrap td.td-actions {
+    display: flex !important;
+    justify-content: flex-end !important;
+  }
+
+  .card .table-wrap td.td-actions .btn {
+    min-width: 84px !important;
+    padding: 8px 10px !important;
+  }
+}
+
 
 /* ─── Mobile Sticky Decision Bar for Request Details ──────────── */
 .mobile-sticky-decision-bar {

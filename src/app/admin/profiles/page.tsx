@@ -7,8 +7,8 @@ import { AuthGuard } from "@/components/auth/AuthGuard";
 
 export interface ProfilePermissions {
   id: string;
-  code: "USER" | "APPROVAL" | "ADMIN";
-  roleKey: "standard" | "approver" | "admin";
+  code: "USER" | "ADMIN";
+  roleKey: "selfservice" | "admin";
   name: string;
   badgeColor: string;
   description: string;
@@ -17,7 +17,7 @@ export interface ProfilePermissions {
     catalog: boolean;
     newRequest: boolean;
     myRequests: boolean;
-    pendingApprovals: boolean;
+    requestsList: boolean;
     workflowBuilder: boolean;
     usersIam: boolean;
     profileSetup: boolean;
@@ -37,18 +37,10 @@ const DEFAULT_PROFILES_META: Omit<ProfilePermissions, "modules" | "actions">[] =
   {
     id: "prof-user",
     code: "USER",
-    roleKey: "standard",
-    name: "Standard Employee (USER)",
+    roleKey: "selfservice",
+    name: "Self-Service Employee (USER)",
     badgeColor: "draft",
     description: "Default profile for general staff. Can initiate requests and track own submissions.",
-  },
-  {
-    id: "prof-approval",
-    code: "APPROVAL",
-    roleKey: "approver",
-    name: "Approver & Manager (APPROVAL)",
-    badgeColor: "info",
-    description: "Management profile for department heads and committee approvers.",
   },
   {
     id: "prof-admin",
@@ -258,7 +250,7 @@ export default function ProfileSetupPage() {
                     alignItems: "center",
                     gap: 8,
                     padding: "8px 14px",
-                    background: selectedMeta.roleKey === "standard" ? "var(--color-primary-light)" : "var(--color-bg)",
+                    background: selectedMeta.roleKey === "selfservice" ? "var(--color-primary-light)" : "var(--color-bg)",
                     borderRadius: "var(--radius-md)",
                     border: "1px solid var(--color-border)",
                     cursor: "pointer",
@@ -269,7 +261,7 @@ export default function ProfileSetupPage() {
                   <input
                     type="radio"
                     name="portalLayout"
-                    checked={selectedMeta.roleKey === "standard"}
+                    checked={selectedMeta.roleKey === "selfservice"}
                     readOnly
                   />
                   Simplified Self-Service Portal (Categories & My Requests Only)
@@ -281,7 +273,7 @@ export default function ProfileSetupPage() {
                     alignItems: "center",
                     gap: 8,
                     padding: "8px 14px",
-                    background: selectedMeta.roleKey !== "standard" ? "var(--color-primary-light)" : "var(--color-bg)",
+                    background: selectedMeta.roleKey !== "selfservice" ? "var(--color-primary-light)" : "var(--color-bg)",
                     borderRadius: "var(--radius-md)",
                     border: "1px solid var(--color-border)",
                     cursor: "pointer",
@@ -292,7 +284,7 @@ export default function ProfileSetupPage() {
                   <input
                     type="radio"
                     name="portalLayout"
-                    checked={selectedMeta.roleKey !== "standard"}
+                    checked={selectedMeta.roleKey !== "selfservice"}
                     readOnly
                   />
                   Full Enterprise Workspace (Dashboard, Analytics & Full Navigation)
@@ -317,7 +309,7 @@ export default function ProfileSetupPage() {
                   { scope: "department", label: "🏢 Department Tickets", desc: "جميع تذاكر القسم والإدارة بالكامل" },
                   { scope: "all", label: "🌐 Global All Tickets", desc: "جميع تذاكر النظام بدون أي قيود (Admin)" },
                 ].map((s) => {
-                  const currentScope = activeRoleConfig.ticketScope || (selectedMeta.roleKey === "admin" ? "all" : selectedMeta.roleKey === "approver" ? "group" : "own");
+                  const currentScope = activeRoleConfig.ticketScope || (selectedMeta.roleKey === "admin" ? "all" : "own");
                   const isChecked = currentScope === s.scope;
                   return (
                     <div
@@ -360,7 +352,7 @@ export default function ProfileSetupPage() {
                   { key: "catalog", label: "Service Catalog", desc: "View authorized request templates" },
                   { key: "newRequest", label: "New Request Form", desc: "Initiate new workflow submissions" },
                   { key: "myRequests", label: "My Requests", desc: "Track personal submitted requests" },
-                  { key: "pendingApprovals", label: "Pending Approvals Panel", desc: "Review & approve requests assigned to user" },
+                  { key: "requestsList", label: "Requests Panel", desc: "Review & act on requests where user is involved" },
                   { key: "workflowBuilder", label: "Workflow Visual Builder", desc: "n8n-style visual node canvas" },
                   { key: "usersIam", label: "Users & IAM Directory", desc: "Manage accounts, departments, and groups" },
                   { key: "profileSetup", label: "Profile Setup & Rules", desc: "Configure role permissions matrix" },
@@ -408,7 +400,7 @@ export default function ProfileSetupPage() {
                   { key: "approveTicket", label: "✓ Approve Ticket Action", desc: "Allows profile to approve ITSM tickets directly" },
                   { key: "rejectTicket", label: "✕ Reject Ticket Action", desc: "Allows profile to reject ITSM tickets" },
                   { key: "reassignTicket", label: "🔄 Reassign Ticket", desc: "Allows profile to reassign tickets to another group" },
-                  { key: "addInternalNote", label: "🔒 Add Internal Notes", desc: "Allows posting notes hidden from standard users" },
+                  { key: "addInternalNote", label: "🔒 Add Internal Notes", desc: "Allows posting notes hidden from self-service users" },
                   { key: "cancelRequest", label: "Cancel Own Request", desc: "Requester can cancel a pending submission" },
                   { key: "delegateApproval", label: "Delegate Approval Step", desc: "Re-assign an approval task to another colleague" },
                   { key: "requestInfoRfi", label: "Send Request For Information (RFI)", desc: "Pause OLA and ask requester for clarification" },

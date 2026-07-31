@@ -6,7 +6,7 @@ import { SYSTEM_USERS, SystemUser, DEFAULT_ROLE_PERMISSIONS } from "@/lib/engine
 export interface AuthGuardProps {
   children: React.ReactNode;
   requiredModule?: keyof typeof DEFAULT_ROLE_PERMISSIONS.admin.modules;
-  allowRoles?: Array<'admin' | 'approver' | 'standard'>;
+  allowRoles?: Array<'admin' | 'selfservice'>;
 }
 
 export function AuthGuard({ children, requiredModule, allowRoles }: AuthGuardProps) {
@@ -63,7 +63,7 @@ export function AuthGuard({ children, requiredModule, allowRoles }: AuthGuardPro
 
   // 2. Module permission check
   if (requiredModule) {
-    const userRoleConfig = DEFAULT_ROLE_PERMISSIONS[currentUser.role] || DEFAULT_ROLE_PERMISSIONS.standard;
+    const userRoleConfig = DEFAULT_ROLE_PERMISSIONS[currentUser.role] || DEFAULT_ROLE_PERMISSIONS.selfservice;
     const isModuleAllowed = userRoleConfig.modules?.[requiredModule] === true;
 
     if (!isModuleAllowed) {

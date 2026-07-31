@@ -1221,7 +1221,7 @@ function FormBuilderInner() {
                 {/* ⚡ Card 2: Decision Action Buttons (Entered Actions) */}
                 <div className="card" style={{ padding: 16, background: "var(--color-surface)", border: "1px solid var(--color-border)" }}>
                   <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: "var(--color-text-primary)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span>⚡ Available Decision Actions for Approver: <strong style={{ color: "var(--color-primary)" }}>Khaled Samir (IT Director)</strong></span>
+                    <span>⚡ Available Decision Actions for Reviewer: <strong style={{ color: "var(--color-primary)" }}>Khaled Samir (IT Director)</strong></span>
                     <span className="tag primary">Approval Step #1</span>
                   </div>
                   
@@ -1453,7 +1453,7 @@ function FormBuilderInner() {
                             </div>
                             <div style={{ fontSize: 11, fontWeight: 700 }}>Requester: [Current Submitting Employee] / [الموظف مقدم المعاملة]</div>
                             <div style={{ fontSize: 11, color: "#4F46E5", marginTop: 4, fontWeight: 700 }}>Group: {panelConfig.defaultAssignedGroup || "IT Support Group"}</div>
-                            <div style={{ fontSize: 11, color: "#059669", marginTop: 2, fontWeight: 700 }}>Approver: {panelConfig.defaultAssignedUser || "Khaled Samir (Manager)"}</div>
+                            <div style={{ fontSize: 11, color: "#059669", marginTop: 2, fontWeight: 700 }}>Reviewer: {panelConfig.defaultAssignedUser || "Khaled Samir (Manager)"}</div>
                             <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 4 }}>CC: {panelConfig.defaultObservers || "Mona Omar, Sara Hassan"}</div>
                           </div>
                         )}
@@ -1593,7 +1593,7 @@ function FormBuilderInner() {
 
 export default function FullFormBuilderPage() {
   return (
-    <AuthGuard requiredModule="workflowBuilder" allowRoles={["admin", "approver"]}>
+    <AuthGuard requiredModule="workflowBuilder" allowRoles={["admin"]}>
       <Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: "var(--color-text-muted)", direction: "rtl" }}>Loading Form Builder...</div>}>
         <FormBuilderInner />
       </Suspense>

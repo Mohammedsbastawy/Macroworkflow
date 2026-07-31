@@ -36,7 +36,7 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
   const [departmentId, setDepartmentId] = useState("");
   const [directManagerId, setDirectManagerId] = useState("");
   const [unit, setUnit] = useState("");
-  const [role, setRole] = useState<string>("standard");
+  const [role, setRole] = useState<string>("selfservice");
   const [isActive, setIsActive] = useState(true);
   const [avatarInitials, setAvatarInitials] = useState("");
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
@@ -69,7 +69,7 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
         setDepartmentId(currentUser.department_id || "");
         setDirectManagerId(currentUser.direct_manager_id || "");
         setUnit(currentUser.unit || "");
-        setRole(currentUser.role || "standard");
+        setRole(currentUser.role || "selfservice");
         setIsActive(currentUser.is_active !== false);
         setAvatarInitials(currentUser.avatar_initials || (currentUser.name ? currentUser.name.substring(0, 2).toUpperCase() : "US"));
         setSelectedGroupIds(currentUser.group_ids || (currentUser as any).group_ids_json || []);
@@ -191,7 +191,7 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <h2 style={{ fontSize: 20, fontWeight: 900, margin: 0 }}>{name || (lang === "ar" ? "مستخدم جديد" : "New User")}</h2>
-              <span className={`badge ${role === "admin" ? "urgent" : role === "approver" ? "info" : "draft"}`}>
+              <span className={`badge ${role === "admin" ? "urgent" : role === "selfservice" ? "draft" : "draft"}`}>
                 {role.toUpperCase()}
               </span>
               <span className={`badge ${isActive ? "success" : "urgent"}`}>
@@ -415,34 +415,17 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
                 </div>
               </label>
 
-              <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 14, background: role === "approver" ? "var(--color-primary-light)" : "var(--color-bg)", borderRadius: 8, border: "1px solid var(--color-border)", cursor: "pointer" }}>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 14, background: role === "selfservice" ? "var(--color-primary-light)" : "var(--color-bg)", borderRadius: 8, border: "1px solid var(--color-border)", cursor: "pointer" }}>
                 <input
                   type="radio"
                   name="userRole"
-                  value="approver"
-                  checked={role === "approver"}
-                  onChange={() => setRole("approver")}
+                  value="selfservice"
+                  checked={role === "selfservice"}
+                  onChange={() => setRole("selfservice")}
                   style={{ marginTop: 4 }}
                 />
                 <div>
-                  <strong style={{ fontSize: 13 }}>👥 {lang === "ar" ? "معتمد / مدير قطاع (Approver / Sector Head)" : "Approver / Department Head"}</strong>
-                  <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 2 }}>
-                    {lang === "ar" ? "صلاحية مراجعة واعتماد وتفويض الطلبات والتذاكر الموجهة للقسم أو القطاع." : "Authority to review, approve, and delegate department request tickets."}
-                  </div>
-                </div>
-              </label>
-
-              <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 14, background: role === "standard" ? "var(--color-primary-light)" : "var(--color-bg)", borderRadius: 8, border: "1px solid var(--color-border)", cursor: "pointer" }}>
-                <input
-                  type="radio"
-                  name="userRole"
-                  value="standard"
-                  checked={role === "standard"}
-                  onChange={() => setRole("standard")}
-                  style={{ marginTop: 4 }}
-                />
-                <div>
-                  <strong style={{ fontSize: 13 }}>👤 {lang === "ar" ? "موظف قياسي (Standard Employee)" : "Standard Employee"}</strong>
+                  <strong style={{ fontSize: 13 }}>👤 {lang === "ar" ? "موظف ذاتي الخدمة (Self-Service Employee)" : "Self-Service Employee"}</strong>
                   <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 2 }}>
                     {lang === "ar" ? "صلاحية تقديم طلبات جديدة عبر البوابة ومتابعة حالة التذاكر الخاصة به فقط." : "Ability to submit new requests and track personal tickets."}
                   </div>
