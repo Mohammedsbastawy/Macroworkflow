@@ -70,10 +70,10 @@ async function executeAction(ticket: any, node: Node) {
   switch (node.type) {
     case 'assign_group_node': updates.assigned_group = data.group_name || data.group_id || ''; if (updates.assigned_group) updates.current_assignees_json = [updates.assigned_group]; break;
     case 'assign_user_node': updates.assigned_user = data.user_name || data.user_id || ''; if (updates.assigned_user) updates.current_assignees_json = [updates.assigned_user]; break;
-    case 'set_priority_node': updates.priority = data.priority || 'normal'; break;
+    case 'set_priority_node': updates.priority = data.priority || 'high'; break;
     case 'set_status_node': updates.status = data.status || 'assigned'; if (data.pending_reason) updates.pending_reason = data.pending_reason; break;
-    case 'attach_sla_node': { const hours = Number(data.sla_ttr_hours ?? data.sla_ttr ?? 0); if (hours > 0) updates.sla_deadline = new Date(Date.now() + hours * 3600000).toISOString(); break; }
-    case 'attach_ola_node': { const hours = Number(data.ola_target_hours ?? 0); if (hours > 0) updates.ola_deadline = new Date(Date.now() + hours * 3600000).toISOString(); break; }
+    case 'attach_sla_node': { const hours = Number(data.sla_ttr_hours ?? data.sla_ttr ?? 48); if (hours > 0) updates.sla_deadline = new Date(Date.now() + hours * 3600000).toISOString(); break; }
+    case 'attach_ola_node': { const hours = Number(data.ola_target_hours ?? 4); if (hours > 0) updates.ola_deadline = new Date(Date.now() + hours * 3600000).toISOString(); break; }
     case 'set_watcher_node': { const watcher = data.watcher_name || data.watcher_id || ''; if (watcher) updates.observer_id = Array.from(new Set([...String(ticket.observer_id || '').split(',').map((v) => v.trim()).filter(Boolean), watcher])).join(', '); break; }
     case 'set_solution_node': updates.solution_type = data.solution_type || 'resolved'; updates.solution_description = data.solution_description || data.label || ''; break;
     case 'update_record': Object.assign(updates, data.ticket_updates || {}); break;
@@ -92,7 +92,7 @@ async function run(ticket: any, workflow: any, startNodeId: string, suppliedValu
     const node = nodes.find((item) => item.id === nodeId);
     if (!node) throw new Error(`Workflow graph references missing node: ${nodeId}`);
     if (node.type === 'approval') {
-      const rawAssignee = node.data?.assignee_value || node.data?.assignee_id || 'Unassigned approver';
+      const rawAssignee = node.data?.assignee_value || node.data?.assignee_id || '{{requester.manager}}';
       const resolved = resolveAssignee(rawAssignee, current);
 
       const currentObservers = String(current.observer_id || '').split(',').map((s: string) => s.trim()).filter(Boolean);
