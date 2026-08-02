@@ -292,7 +292,7 @@ CREATE TABLE `policy_travel_rates` (
   FOREIGN KEY (`policy_id`) REFERENCES `Policies` (`PolicyID`) ON DELETE CASCADE,
   FOREIGN KEY (`zone_from_id`) REFERENCES `TravelZones` (`TravelZoneID`) ON DELETE CASCADE,
   FOREIGN KEY (`zone_to_id`) REFERENCES `TravelZones` (`TravelZoneID`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `workflow_simulations`;
 CREATE TABLE `workflow_simulations` (
