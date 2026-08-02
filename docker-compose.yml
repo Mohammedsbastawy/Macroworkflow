@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: workflow-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root123password
+      MYSQL_DATABASE: emacro_dashboard
+      MYSQL_USER: emacro_user
+      MYSQL_PASSWORD: emacro_password_strong
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: workflow-app
+    restart: always
+    ports:
+      - "80:3000"
+    environment:
+      # نقوم بتوجيه الاتصال لقاعدة البيانات للخدمة 'db' المعرفة بالأعلى
+      DATABASE_URL: mysql://emacro_user:emacro_password_strong@db:3306/emacro_dashboard
+      PORT: 3000
+      NODE_ENV: production
+      NEXTAUTH_URL: http://localhost
+      NEXTAUTH_SECRET: super-secret-key-for-nextauth-production
+    depends_on:
+      db:
+        condition: service_healthy
+    # نقوم بتشغيل سكربت التهيئة والتغذية ثم بدء السيرفر
+    command: >
+      sh -c "node database/init_db.js && node database/seed_mysql.mjs && npm run start"
+
+volumes:
+  mysql_data:
