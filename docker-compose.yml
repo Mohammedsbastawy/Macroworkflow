@@ -30,6 +30,11 @@ services:
     environment:
       # نقوم بتوجيه الاتصال لقاعدة البيانات للخدمة 'db' المعرفة بالأعلى
       DATABASE_URL: mysql://emacro_user:emacro_password_strong@db:3306/emacro_dashboard
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: emacro_dashboard
+      MYSQL_USER: emacro_user
+      MYSQL_PASSWORD: emacro_password_strong
       PORT: 3000
       NODE_ENV: production
       NEXTAUTH_URL: http://localhost

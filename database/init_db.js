@@ -71,12 +71,15 @@ loadEnv();
     await connection.query(`CREATE DATABASE IF NOT EXISTS \`${config.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
     await connection.query(`USE \`${config.database}\`;`);
 
-    // 2. التحقق من وجود جداول مسبقة
+    // 2. التحقق من وجود الهيكل الجديد (Users) لتفادي إعادة البناء على قاعدة قديمة
     const [tables] = await connection.query("SHOW TABLES");
-    if (tables.length > 0) {
-      console.log(`قاعدة البيانات "${config.database}" تحتوي بالفعل على ${tables.length} من الجداول. تخطي بناء الهيكل.`);
+    const existing = tables.map((row) => Object.values(row)[0]);
+    const hasNewSchema = existing.includes('Users') && existing.includes('Tickets');
+
+    if (existing.length > 0 && hasNewSchema) {
+      console.log(`قاعدة البيانات "${config.database}" تحتوي بالفعل على الهيكل الجديد (${existing.length} جداول). تخطي بناء الهيكل.`);
     } else {
-      console.log('قاعدة البيانات فارغة. جاري تهيئة الهيكل (Schema Init)...');
+      console.log('جاري تهيئة الهيكل الجديد (Schema Init)...');
       const schemaPath = path.join(__dirname, 'mysql_schema_init.sql');
       let schemaSql = fs.readFileSync(schemaPath, 'utf8');
 
@@ -88,7 +91,7 @@ loadEnv();
 
       // تشغيل ملف الهيكل بالكامل
       await connection.query(schemaSql);
-      console.log('تم بناء هيكل الجداول بنجاح.');
+      console.log('تم بناء هيكل الجداول الجديدة بنجاح.');
     }
   } catch (err) {
     console.error('فشل في تهيئة قاعدة البيانات:', err.message);
