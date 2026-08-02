@@ -192,3 +192,24 @@ sudo npm install -g pm2
    ```
 
 Your application is now hosted and runs automatically in the background! 🚀
+
+---
+
+## 🐳 Docker Deployment (One-Click Run)
+
+For quick deployment of the full stack (Next.js App + MySQL Database) using Docker Compose.
+
+### Configurable Variables in `docker-compose.yml`
+Before running, you must customize the following environment variables under the `app` service inside [docker-compose.yml](file:///d:/Macro%20Workflow%20System/workflow-engine/docker-compose.yml):
+
+* **`NEXTAUTH_URL`**: Change this from `http://localhost` to your server's IP address or domain (e.g., `http://192.168.3.48`). This prevents redirection issues during login.
+* **`DATABASE_URL`**: Set database connection URL (configured automatically to point to the `db` service).
+* **`NEXTAUTH_SECRET`**: A random secure key used to encrypt auth tokens in production.
+
+For detailed Arabic instructions, see [DOCKER.md](file:///d:/Macro%20Workflow%20System/workflow-engine/DOCKER.md).
+
+### Run Application:
+```bash
+docker compose up -d --build
+```
+
