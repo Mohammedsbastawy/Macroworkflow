@@ -91,7 +91,25 @@ loadEnv();
 
       // تشغيل ملف الهيكل بالكامل
       await connection.query(schemaSql);
-      console.log('تم بناء هيكل الجداول الجديدة بنجاح.');
+      console.log('تم بناء هيكل الجداول بنجاح.');
+
+      // 3. تغذية البيانات الافتراضية تلقائياً من mysql_inserts.sql
+      const insertsPath = path.join(__dirname, 'mysql_inserts.sql');
+      if (fs.existsSync(insertsPath)) {
+        console.log('جاري تغذية قاعدة البيانات بالبيانات الأساسية والافتراضية (mysql_inserts.sql)...');
+        let insertsSql = fs.readFileSync(insertsPath, 'utf8');
+        
+        // إزالة سطر USE لتجنب أي تعارض مع قاعدة البيانات الحالية
+        insertsSql = insertsSql
+          .split('\n')
+          .filter(line => !line.trim().startsWith('USE '))
+          .join('\n');
+
+        await connection.query(insertsSql);
+        console.log('تمت تغذية قاعدة البيانات بنجاح باليوزرات، الأقسام، وسير العمل.');
+      } else {
+        console.log('تنبيه: لم يتم العثور على ملف mysql_inserts.sql لتغذية قاعدة البيانات.');
+      }
     }
   } catch (err) {
     console.error('فشل في تهيئة قاعدة البيانات:', err.message);
