@@ -24,6 +24,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/database ./database
+COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/emacro_db_check.js ./emacro_db_check.js
 
 EXPOSE 3000
