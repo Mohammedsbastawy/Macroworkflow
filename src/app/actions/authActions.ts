@@ -23,10 +23,10 @@ export async function loginWithPasswordAction(formData: FormData) {
 
   let user: any = null;
   try {
-    const active = await dbGet("system_users", { is_active: 1 });
+    const active = await dbGet("Users", { IsActive: 1 });
     user =
-      active.find((u: any) => u.username === username) ||
-      active.find((u: any) => (u.email || "").toLowerCase() === username.toLowerCase());
+      active.find((u: any) => u.LoginName === username) ||
+      active.find((u: any) => (u.UserEmail || "").toLowerCase() === username.toLowerCase());
   } catch (e) {
     console.error("login lookup error:", e);
     return { error: "Sign-in is temporarily unavailable. Please try again." };
@@ -36,18 +36,18 @@ export async function loginWithPasswordAction(formData: FormData) {
     return { error: "Account not found. Please contact your administrator." };
   }
 
-  const authType = (user.auth_type || "password").toLowerCase();
+  const authType = (user.AuthType || "password").toLowerCase();
   if (authType !== "password" && authType !== "both") {
     return {
       error: "This account signs in with Microsoft 365. Please use the 'Sign in with Microsoft' button.",
     };
   }
 
-  if (!user.password_hash) {
+  if (!user.PasswordHash) {
     return { error: "No password is set for this account. Contact your administrator." };
   }
 
-  const ok = await bcrypt.compare(password, user.password_hash);
+  const ok = await bcrypt.compare(password, user.PasswordHash);
   if (!ok) {
     return { error: "Incorrect username or password." };
   }
@@ -56,7 +56,7 @@ export async function loginWithPasswordAction(formData: FormData) {
   try {
     await signIn("credentials", {
       type: "password",
-      userId: user.id,
+      userId: user.UserID,
       password,
       redirect: false,
     });

@@ -57,7 +57,7 @@ export async function runWorkflowSimulation(
   const now = new Date().toISOString();
   
   // 1. Fetch Workflow Template
-  const workflow = await dbGetOne<any>('workflows', workflowId);
+  const workflow = await dbGetOne<any>('Workflows', workflowId);
   if (!workflow) {
     return {
       success: false,
@@ -110,7 +110,7 @@ export async function runWorkflowSimulation(
   }
 
   // 3. Phase 2: Traverse Steps
-  const steps: WorkflowStep[] = workflow.steps_json || [];
+  const steps: WorkflowStep[] = (workflow.StepsJson ?? workflow.steps_json) || [];
   const sortedSteps = [...steps].sort((a, b) => a.step_order - b.step_order);
 
   if (sortedSteps.length === 0) {

@@ -44,4 +44,7 @@ next-env.d.ts
 /uploads/
 /scratch/
 tmp_*
+_query_*
+_query_tmp.js
+
 

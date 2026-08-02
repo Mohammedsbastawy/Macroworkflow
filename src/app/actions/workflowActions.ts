@@ -522,8 +522,17 @@ export async function fetchWorkflowCanvasGraphAction(slug: string) {
 export async function fetchOrgHierarchyAction() {
   const { dbGet } = await import('@/lib/db/mysqlClient');
   try {
-    const rows = await dbGet('departments');
-    if (rows && rows.length > 0) return rows;
+    const rows = await dbGet('Departments');
+    if (rows && rows.length > 0) {
+      return rows.map((r: any) => ({
+        id: r.DepartmentID,
+        name: r.DepartmentName,
+        code: r.DepartmentCode,
+        parent_department_id: r.ParentDepartmentID,
+        manager_id: r.ManagerUserID,
+        head_user_id: r.HeadUserID,
+      }));
+    }
   } catch (e) {
     console.error('database departments fetch fallback to seeded hierarchy:', e);
   }
@@ -537,8 +546,16 @@ export async function fetchOrgHierarchyAction() {
 export async function fetchBudgetsAction() {
   const { dbGet } = await import('@/lib/db/mysqlClient');
   try {
-    const rows = await dbGet('budgets');
-    return rows || [];
+    const rows = await dbGet('Budgets');
+    return (rows || []).map((r: any) => ({
+      id: r.BudgetID,
+      department_id: r.DepartmentID,
+      fiscal_year: r.FiscalYear,
+      quarter: r.Quarter,
+      allocated_amount: r.AllocatedAmount,
+      spent_amount: r.SpentAmount,
+      currency: r.Currency,
+    }));
   } catch (e) {
     return [];
   }
@@ -554,10 +571,18 @@ export async function saveBudgetAction(payload: {
   currency?: string;
 }) {
   const { dbCreate, dbUpdate } = await import('@/lib/db/mysqlClient');
+  const record = {
+    DepartmentID: payload.department_id,
+    FiscalYear: payload.fiscal_year,
+    Quarter: payload.quarter,
+    AllocatedAmount: payload.allocated_amount,
+    SpentAmount: payload.spent_amount || 0,
+    Currency: payload.currency || 'EGP',
+  };
   if (payload.id) {
-    await dbUpdate('budgets', payload.id, payload);
+    await dbUpdate('Budgets', payload.id, record);
   } else {
-    await dbCreate('budgets', payload);
+    await dbCreate('Budgets', record);
   }
   revalidatePath('/admin/budgets');
   return { success: true };
@@ -569,16 +594,23 @@ export async function saveBudgetAction(payload: {
 export async function fetchPoliciesAction() {
   const { dbGet } = await import('@/lib/db/mysqlClient');
   try {
-    const rows = await dbGet('policies');
+    const rows = await dbGet('Policies');
     if (rows && rows.length > 0) {
       return rows.map((r: any) => {
-        const applyToAll = r.apply_to_all === undefined || r.apply_to_all === null
-          ? (r.department_id ? 0 : 1)
-          : r.apply_to_all;
-        const deptIds = r.department_ids_json || (r.department_id ? [r.department_id] : []);
-        const groupIds = r.group_ids_json || [];
+        const deptId = r.DepartmentID || null;
+        const applyToAll = r.ApplyToAll === undefined || r.ApplyToAll === null
+          ? (deptId ? 0 : 1)
+          : r.ApplyToAll;
+        const deptIds = r.DepartmentIDsJson || (deptId ? [deptId] : []);
+        const groupIds = r.GroupIDsJson || [];
         return {
-          ...r,
+          id: r.PolicyID,
+          name: r.PolicyName,
+          department_id: deptId,
+          description: r.Description,
+          code: r.PolicyCode,
+          is_active: r.IsActive,
+          rules_json: r.RulesJson || [],
           apply_to_all: applyToAll,
           department_ids_json: deptIds,
           group_ids_json: groupIds,
@@ -673,16 +705,27 @@ export async function savePolicyAction(payload: {
   apply_to_all?: boolean | number;
 }) {
   const { dbCreate, dbUpdate, dbGetOne } = await import('@/lib/db/mysqlClient');
+  const record = {
+    PolicyName: payload.name,
+    DepartmentID: payload.department_id || null,
+    DepartmentIDsJson: payload.department_ids_json || [],
+    GroupIDsJson: payload.group_ids_json || [],
+    ApplyToAll: payload.apply_to_all !== undefined ? payload.apply_to_all : (payload.department_id ? 0 : 1),
+    Description: payload.description || '',
+    PolicyCode: payload.code || '',
+    IsActive: payload.is_active,
+    RulesJson: payload.rules_json || [],
+  };
   try {
     if (payload.id) {
-      const existing = await dbGetOne('policies', payload.id);
+      const existing = await dbGetOne('Policies', payload.id);
       if (existing) {
-        await dbUpdate('policies', payload.id, payload);
+        await dbUpdate('Policies', payload.id, record);
       } else {
-        await dbCreate('policies', payload);
+        await dbCreate('Policies', { ...record, PolicyID: payload.id });
       }
     } else {
-      await dbCreate('policies', payload);
+      await dbCreate('Policies', record);
     }
   } catch (e) {
     console.error('database policies save failure:', e);
@@ -695,7 +738,7 @@ export async function deletePolicyAction(id: string) {
   const { dbDelete, dbDeleteWhere } = await import('@/lib/db/mysqlClient');
   try {
     await dbDeleteWhere('policy_travel_rates', 'policy_id', id);
-    await dbDelete('policies', id);
+    await dbDelete('Policies', id);
   } catch (e) {}
   revalidatePath('/admin/policies');
   return { success: true };
@@ -855,8 +898,15 @@ const EGYPT_MASTER_TRAVEL_PLACES = [
 export async function fetchTravelZonesAction() {
   const { dbGet } = await import('@/lib/db/mysqlClient');
   try {
-    const rows = await dbGet('travel_zones');
-    if (rows && rows.length > 0) return rows;
+    const rows = await dbGet('TravelZones');
+    if (rows && rows.length > 0) {
+      return rows.map((r: any) => ({
+        id: r.TravelZoneID,
+        name: r.TravelZoneName,
+        code: r.TravelZoneCode,
+        is_active: r.IsActive,
+      }));
+    }
   } catch (e) {}
 
   return EGYPT_MASTER_TRAVEL_PLACES;
@@ -869,11 +919,16 @@ export async function saveTravelZoneAction(payload: {
   is_active: boolean;
 }) {
   const { dbCreate, dbUpdate } = await import('@/lib/db/mysqlClient');
+  const record = {
+    TravelZoneName: payload.name,
+    TravelZoneCode: payload.code,
+    IsActive: payload.is_active,
+  };
   try {
     if (payload.id) {
-      await dbUpdate('travel_zones', payload.id, payload);
+      await dbUpdate('TravelZones', payload.id, record);
     } else {
-      await dbCreate('travel_zones', payload);
+      await dbCreate('TravelZones', record);
     }
   } catch (e) {
     console.warn('database travel_zones save fallback:', e);
@@ -885,7 +940,7 @@ export async function saveTravelZoneAction(payload: {
 export async function deleteTravelZoneAction(id: string) {
   const { dbDelete } = await import('@/lib/db/mysqlClient');
   try {
-    await dbDelete('travel_zones', id);
+    await dbDelete('TravelZones', id);
   } catch (e) {}
   revalidatePath('/admin/policies');
   return { success: true };
@@ -909,24 +964,36 @@ export async function fetchSystemUsersAction() {
   }
   const { dbGet } = await import('@/lib/db/mysqlClient');
   try {
-    const rows = await dbGet('system_users');
+    const rows = await dbGet('Users');
     if (rows && rows.length > 0) {
       const data = rows.map((r: any) => {
-        const rawRole = r.role || 'selfservice';
+        const rawRole = r.Role || 'selfservice';
         const role = normalizeRole(rawRole);
         let roles: string[];
-        if (r.roles_json) {
-          roles = r.roles_json.map(normalizeRole);
-        } else if (Array.isArray(r.roles)) {
-          roles = r.roles.map(normalizeRole);
+        if (r.RolesJson) {
+          roles = r.RolesJson.map(normalizeRole);
+        } else if (Array.isArray(r.Roles)) {
+          roles = r.Roles.map(normalizeRole);
         } else {
           roles = [role];
         }
         return {
-          ...r,
+          id: r.UserID,
+          name: r.UserName,
+          email: r.UserEmail,
+          department_id: r.DepartmentID,
+          job_title: r.JobTitle,
+          direct_manager_id: r.DirectManagerUserID,
+          unit: r.Unit,
+          avatar_initials: r.AvatarInitials,
+          is_active: r.IsActive,
+          username: r.LoginName, 
+          phone: r.Phone,
           role,
           roles,
-          group_ids: r.group_ids_json || [],
+          role_raw: rawRole,
+          group_ids: r.GroupIDsJson || [],
+          group_ids_json: r.GroupIDsJson || [],
         };
       });
       cachedUsers = { data, timestamp: now };
@@ -967,34 +1034,46 @@ export async function saveSystemUserAction(payload: {
   const role = payload.role || 'selfservice';
   const roles = payload.roles || [role];
   const record: Record<string, any> = {
-    ...payload,
-    role,
-    roles_json: roles,
-    group_ids_json: payload.group_ids,
+    UserName: payload.name,
+    UserEmail: payload.email,
+    DepartmentID: payload.department_id || null,
+    Role: role,
+    RolesJson: roles,
+    AvatarInitials: payload.avatar_initials || '',
+    JobTitle: payload.job_title || '',
+    DirectManagerUserID: payload.direct_manager_id || null,
+    Unit: payload.unit || '',
+    GroupIDsJson: payload.group_ids || [],
+    IsActive: payload.is_active === undefined ? 1 : payload.is_active,
   };
-  delete record.group_ids;
-  delete record.roles;
 
   // Local credentials
-  if (payload.username !== undefined) record.username = payload.username;
-  if (payload.auth_type) record.auth_type = payload.auth_type;
+  if (payload.username !== undefined) record.LoginName = payload.username;
+  if (payload.auth_type) record.AuthType = payload.auth_type;
+  if (payload.phone !== undefined) record.Phone = payload.phone;
+  if (payload.delegated_user_id !== undefined) record.DelegatedUserId = payload.delegated_user_id;
+  if (payload.delegation_enabled !== undefined) record.DelegationEnabled = payload.delegation_enabled;
+  if (payload.delegation_start_date !== undefined) record.DelegationStartDate = payload.delegation_start_date;
+  if (payload.delegation_end_date !== undefined) record.DelegationEndDate = payload.delegation_end_date;
+  if (payload.delegation_notes !== undefined) record.DelegationNotes = payload.delegation_notes;
+  if (payload.can_assign_group_tickets !== undefined) record.CanAssignGroupTickets = payload.can_assign_group_tickets;
+
   // Hash new/cleartext passwords (skip masked placeholders from the edit form).
   if (payload.password && payload.password.trim() && !payload.password.includes('••')) {
     const bcrypt = await import('bcryptjs');
-    record.password_hash = await bcrypt.hash(payload.password, 10);
+    record.PasswordHash = await bcrypt.hash(payload.password, 10);
   }
   if (payload.username !== undefined || payload.password) {
-    record.auth_type = payload.auth_type || 'password';
+    record.AuthType = payload.auth_type || 'password';
   }
-  delete record.password;
 
   try {
     if (payload.id) {
-      await dbUpdate('system_users', payload.id, record);
+      await dbUpdate('Users', payload.id, record);
     } else {
-      await dbCreate('system_users', {
+      await dbCreate('Users', {
         ...record,
-        id: payload.id || `user-${Date.now()}`,
+        UserID: payload.id || `user-${Date.now()}`,
       });
     }
   } catch (e) {
@@ -1009,11 +1088,15 @@ export async function saveSystemUserAction(payload: {
 export async function fetchBusinessGroupsAction() {
   const { dbGet } = await import('@/lib/db/mysqlClient');
   try {
-    const rows = await dbGet('business_groups');
+    const rows = await dbGet('BusinessGroups');
     if (rows && rows.length > 0) {
       return rows.map((r: any) => ({
-        ...r,
-        member_user_ids: r.member_user_ids_json || [],
+        id: r.BusinessGroupID,
+        name: r.BusinessGroupName,
+        code: r.BusinessGroupCode,
+        is_active: r.IsActive,
+        member_user_ids: r.MemberUserIDsJson || [],
+        member_user_ids_json: r.MemberUserIDsJson || [],
       }));
     }
   } catch (e) {
@@ -1033,18 +1116,20 @@ export async function saveBusinessGroupAction(payload: {
 }) {
   const { dbCreate, dbUpdate } = await import('@/lib/db/mysqlClient');
   const record = {
-    ...payload,
-    member_user_ids_json: payload.member_user_ids,
+    BusinessGroupName: payload.name,
+    BusinessGroupCode: payload.code,
+    MemberUserIDsJson: payload.member_user_ids,
+    IsActive: payload.is_active === undefined ? 1 : payload.is_active,
+    ManagerUserID: payload.manager_id || null,
   };
-  delete (record as any).member_user_ids;
 
   try {
     if (payload.id) {
-      await dbUpdate('business_groups', payload.id, record);
+      await dbUpdate('BusinessGroups', payload.id, record);
     } else {
-      await dbCreate('business_groups', {
+      await dbCreate('BusinessGroups', {
         ...record,
-        id: payload.id || `group-${Date.now()}`,
+        BusinessGroupID: payload.id || `group-${Date.now()}`,
       });
     }
   } catch (e) {
@@ -1062,13 +1147,19 @@ export async function saveDepartmentAction(payload: {
   parent_department_id?: string | null;
 }) {
   const { dbCreate, dbUpdate } = await import('@/lib/db/mysqlClient');
+  const record = {
+    DepartmentName: payload.name,
+    DepartmentCode: payload.code,
+    HeadUserID: payload.head_user_id || null,
+    ParentDepartmentID: payload.parent_department_id || null,
+  };
   try {
     if (payload.id) {
-      await dbUpdate('departments', payload.id, payload);
+      await dbUpdate('Departments', payload.id, record);
     } else {
-      await dbCreate('departments', {
-        ...payload,
-        id: `dept-${payload.code.toLowerCase().trim()}`,
+      await dbCreate('Departments', {
+        ...record,
+        DepartmentID: `dept-${payload.code.toLowerCase().trim()}`,
       });
     }
   } catch (e) {
@@ -1134,7 +1225,7 @@ export async function fetchPolicyTravelRatesAction(policyId?: string, userId?: s
 
   // Collect group tokens from reverse group membership lookup
   for (const bg of (dbGroups || [])) {
-    const members = bg.member_user_ids || bg.member_user_ids_json || [];
+    const members = (bg as any).member_user_ids || (bg as any).member_user_ids_json || [];
     const isMember = Array.isArray(members) && members.some((m: any) => {
       if (!m) return false;
       const cleanM = String(m).toLowerCase().trim();
@@ -1286,35 +1377,35 @@ export async function updateTicketClassificationAction(
   const { dbUpdate, dbGet } = await import('@/lib/engine/store');
   
   const ticketUpdates: Record<string, any> = {};
-  if (updates.status !== undefined) ticketUpdates.status = updates.status;
-  if (updates.priority !== undefined) ticketUpdates.priority = updates.priority;
-  if (updates.urgency !== undefined) ticketUpdates.urgency = updates.urgency;
-  if (updates.impact !== undefined) ticketUpdates.impact = updates.impact;
-  if (updates.subcategory_id !== undefined) ticketUpdates.subcategory_id = updates.subcategory_id;
-  if (updates.location_id !== undefined) ticketUpdates.location_id = updates.location_id;
-  if (updates.unit !== undefined) ticketUpdates.unit = updates.unit;
-  if (updates.assigned_group !== undefined) ticketUpdates.assigned_group = updates.assigned_group;
-  if (updates.assigned_user !== undefined) ticketUpdates.assigned_user = updates.assigned_user;
-  if (updates.requester_name !== undefined) ticketUpdates.requester_name = updates.requester_name;
-  if (updates.requester_department !== undefined) ticketUpdates.requester_department = updates.requester_department;
-  if (updates.observer_id !== undefined) ticketUpdates.observer_id = updates.observer_id;
-  if (updates.sla_tto_deadline !== undefined) ticketUpdates.sla_tto_deadline = updates.sla_tto_deadline;
-  if (updates.sla_ttr_deadline !== undefined) ticketUpdates.sla_ttr_deadline = updates.sla_ttr_deadline;
-  if (updates.sla_deadline !== undefined) ticketUpdates.sla_deadline = updates.sla_deadline;
+  if (updates.status !== undefined) ticketUpdates.Status = updates.status;
+  if (updates.priority !== undefined) ticketUpdates.Priority = updates.priority;
+  if (updates.urgency !== undefined) ticketUpdates.Urgency = updates.urgency;
+  if (updates.impact !== undefined) ticketUpdates.Impact = updates.impact;
+  if (updates.subcategory_id !== undefined) ticketUpdates.SubcategoryID = updates.subcategory_id;
+  if (updates.location_id !== undefined) ticketUpdates.LocationID = updates.location_id;
+  if (updates.unit !== undefined) ticketUpdates.Unit = updates.unit;
+  if (updates.assigned_group !== undefined) ticketUpdates.AssignedGroup = updates.assigned_group;
+  if (updates.assigned_user !== undefined) ticketUpdates.AssignedUser = updates.assigned_user;
+  if (updates.requester_name !== undefined) ticketUpdates.RequesterName = updates.requester_name;
+  if (updates.requester_department !== undefined) ticketUpdates.RequesterDepartment = updates.requester_department;
+  if (updates.observer_id !== undefined) ticketUpdates.ObserverUserID = updates.observer_id;
+  if (updates.sla_tto_deadline !== undefined) ticketUpdates.SlaTtoDeadline = updates.sla_tto_deadline;
+  if (updates.sla_ttr_deadline !== undefined) ticketUpdates.SlaTtrDeadline = updates.sla_ttr_deadline;
+  if (updates.sla_deadline !== undefined) ticketUpdates.SlaDeadline = updates.sla_deadline;
 
-  await dbUpdate('tickets', requestId, ticketUpdates);
+  await dbUpdate('Tickets', requestId, ticketUpdates);
 
   try {
-    const existingValues = await dbGet('ticket_values', { request_id: { _eq: requestId } });
+    const existingValues = await dbGet('TicketValues', { TicketID: { _eq: requestId } });
     for (const valRow of existingValues) {
-      if (valRow.field_key === 'glpi_urgency' && updates.urgency) {
-        await dbUpdate('ticket_values', valRow.id, { field_value: updates.urgency });
+      if (valRow.FieldKey === 'glpi_urgency' && updates.urgency) {
+        await dbUpdate('TicketValues', valRow.TicketValueID, { ValueText: updates.urgency });
       }
-      if (valRow.field_key === 'glpi_category' && updates.subcategory_id) {
-        await dbUpdate('ticket_values', valRow.id, { field_value: updates.subcategory_id });
+      if (valRow.FieldKey === 'glpi_category' && updates.subcategory_id) {
+        await dbUpdate('TicketValues', valRow.TicketValueID, { ValueText: updates.subcategory_id });
       }
-      if (valRow.field_key === 'glpi_location' && updates.location_id) {
-        await dbUpdate('ticket_values', valRow.id, { field_value: updates.location_id });
+      if (valRow.FieldKey === 'glpi_location' && updates.location_id) {
+        await dbUpdate('TicketValues', valRow.TicketValueID, { ValueText: updates.location_id });
       }
     }
   } catch (e) {
@@ -1332,34 +1423,34 @@ export async function assignTicketUserAction(ticketId: string, assignedUser: str
   
   // Calculate SLA TTO takeover duration
   const { dbGetOne } = await import('@/lib/db/mysqlClient');
-  const ticket = await dbGetOne('tickets', ticketId);
-  const previousAssignee = ticket?.assigned_user || '';
+  const ticket = await dbGetOne('Tickets', ticketId);
+  const previousAssignee = ticket?.AssignedUser || '';
   let slaTtoLog = '';
   if (ticket) {
-    const ttoStart = new Date(ticket.date_created).getTime();
+    const ttoStart = new Date(ticket.DateCreated).getTime();
     const ttoElapsedMs = Date.now() - ttoStart;
     const ttoElapsedMins = Math.round(ttoElapsedMs / 60000);
     const ttoElapsedStr = ttoElapsedMins >= 60 ? `${Math.floor(ttoElapsedMins / 60)}h ${ttoElapsedMins % 60}m` : `${ttoElapsedMins}m`;
 
-    const wf = await dbGetOne('workflows', ticket.workflow_id);
-    const panelCfg = wf?.visibility_rules_json?.ticket_info_panel_config || wf?.visibility_rules?.ticket_info_panel_config || {};
+    const wf = await dbGetOne('Workflows', ticket.WorkflowID);
+    const panelCfg = wf?.VisibilityRulesJson?.ticket_info_panel_config || wf?.visibility_rules?.ticket_info_panel_config || {};
     const ttoTargetStr = panelCfg.defaultSlaTto || '1 Hour';
     slaTtoLog = `\n\n[SLA Tracker]: SLA TTO (Takeover) completed. Time taken: ${ttoElapsedStr}. Target was: ${ttoTargetStr}.`;
   }
 
-  await dbUpdate('tickets', ticketId, {
-    assigned_user: assignedUser,
-    date_updated: now,
+  await dbUpdate('Tickets', ticketId, {
+    AssignedUser: assignedUser,
+    DateUpdated: now,
   });
 
   // Create audit comment log
-  await dbCreate('approval_log', {
-    id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    ticket_id: ticketId,
-    action: 'commented',
-    actor_name: actorName,
-    comments: `Ticket assigned to employee: ${assignedUser} by ${actorName}.${slaTtoLog}`,
-    decision_at: now,
+  await dbCreate('ApprovalLog', {
+    ApprovalLogID: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    TicketID: ticketId,
+    Action: 'commented',
+    ActorUserName: actorName,
+    Comments: `Ticket assigned to employee: ${assignedUser} by ${actorName}.${slaTtoLog}`,
+    DecisionAt: now,
   });
 
   // ── Notification: assignment
@@ -1368,9 +1459,9 @@ export async function assignTicketUserAction(ticketId: string, assignedUser: str
     // Notify the new assignee.
     void notify({
       eventType: 'assigned_to_you',
-      ticket: { ...(ticket || {}), id: ticketId, assigned_user: assignedUser },
+      ticket: { ...(ticket || {}), TicketID: ticketId, AssignedUser: assignedUser },
       ticketId,
-      ticketNumber: ticket?.ticket_number,
+      ticketNumber: ticket?.TicketNumber,
       actorId: actorName,
       actorName,
       recipients: [assignedUser],
@@ -1379,9 +1470,9 @@ export async function assignTicketUserAction(ticketId: string, assignedUser: str
     if (previousAssignee && previousAssignee !== assignedUser) {
       void notify({
         eventType: 'assignment_changed',
-        ticket: { ...(ticket || {}), id: ticketId },
+        ticket: { ...(ticket || {}), TicketID: ticketId },
         ticketId,
-        ticketNumber: ticket?.ticket_number,
+        ticketNumber: ticket?.TicketNumber,
         actorId: actorName,
         actorName,
         recipients: [previousAssignee],

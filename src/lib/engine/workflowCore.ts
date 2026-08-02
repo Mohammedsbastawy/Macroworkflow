@@ -31,7 +31,7 @@ import { notify } from '@/lib/notifications/notifier';
  * Get all active workflows from database, sorted by newest first.
  */
 export async function getWorkflows(): Promise<WorkflowTemplateStore[]> {
-  const rows = await dbGet('workflows', {}, '-date_created');
+  const rows = await dbGet('Workflows', {}, '-DateCreated');
   return rows
     .map(normalizeWorkflow)
     .filter((w) => w.status !== 'archived' && (w as any).is_archived !== true);
@@ -42,10 +42,10 @@ export async function getWorkflows(): Promise<WorkflowTemplateStore[]> {
  */
 export async function getWorkflowBySlug(slug: string): Promise<WorkflowTemplateStore | null> {
   // Try by slug first
-  let rows = await dbGet('workflows', { slug: { _eq: slug } }, undefined, 1);
+  let rows = await dbGet('Workflows', { WorkflowSlug: { _eq: slug } }, undefined, 1);
   if (rows.length === 0) {
     // Try by id
-    rows = await dbGet('workflows', { id: { _eq: slug } }, undefined, 1);
+    rows = await dbGet('Workflows', { WorkflowID: { _eq: slug } }, undefined, 1);
   }
   if (rows.length === 0) return null;
   return normalizeWorkflow(rows[0]);
@@ -69,62 +69,62 @@ export async function saveWorkflowTemplate(
   // Helper to merge existing record with update payload safely without wiping fields/steps
   const buildUpdatePayload = (existingRecord: any) => {
     return {
-      name: templateData.name || existingRecord.name || 'Workflow',
-      slug: slug || existingRecord.slug,
-      category: templateData.category || existingRecord.category || 'General',
-      description: templateData.description !== undefined ? templateData.description : existingRecord.description,
-      icon: templateData.icon || existingRecord.icon || '⚡',
-      color: templateData.color || existingRecord.color || '#4F46E5',
-      version: templateData.version || existingRecord.version || 1,
-      published_version: templateData.published_version || existingRecord.published_version || 1,
-      sla_total_hours: templateData.sla_total_hours || existingRecord.sla_total_hours || 48,
-      react_flow_graph_json: passedGraph !== undefined ? passedGraph : (existingRecord.react_flow_graph_json || null),
-      visibility_rules_json: passedVis !== undefined ? passedVis : (existingRecord.visibility_rules_json || null),
-      steps_json: passedSteps !== undefined ? passedSteps : (existingRecord.steps_json || []),
-      fields_json: passedFields !== undefined ? passedFields : (existingRecord.fields_json || []),
-      date_updated: new Date().toISOString(),
+      WorkflowName: templateData.name || existingRecord.WorkflowName || 'Workflow',
+      WorkflowSlug: slug || existingRecord.WorkflowSlug,
+      Category: templateData.category || existingRecord.Category || 'General',
+      Description: templateData.description !== undefined ? templateData.description : existingRecord.Description,
+      Icon: templateData.icon || existingRecord.Icon || '⚡',
+      Color: templateData.color || existingRecord.Color || '#4F46E5',
+      Version: templateData.version || existingRecord.Version || 1,
+      PublishedVersion: templateData.published_version || existingRecord.PublishedVersion || 1,
+      SlaTotalHours: templateData.sla_total_hours || existingRecord.SlaTotalHours || 48,
+      ReactFlowGraphJson: passedGraph !== undefined ? passedGraph : (existingRecord.ReactFlowGraphJson || null),
+      VisibilityRulesJson: passedVis !== undefined ? passedVis : (existingRecord.VisibilityRulesJson || null),
+      StepsJson: passedSteps !== undefined ? passedSteps : (existingRecord.StepsJson || []),
+      FieldsJson: passedFields !== undefined ? passedFields : (existingRecord.FieldsJson || []),
+      DateUpdated: new Date().toISOString(),
     };
   };
 
   // Check if workflow already exists by id
   if (templateData.id) {
-    const existing = await dbGetOne('workflows', templateData.id);
+    const existing = await dbGetOne('Workflows', templateData.id);
     if (existing) {
       const updatePayload = buildUpdatePayload(existing);
-      const updated = await dbUpdate('workflows', templateData.id, updatePayload);
+      const updated = await dbUpdate('Workflows', templateData.id, updatePayload);
       return normalizeWorkflow(updated);
     }
   }
 
   // Check by slug
-  const bySlug = await dbGet('workflows', { slug: { _eq: slug } }, undefined, 1);
+  const bySlug = await dbGet('Workflows', { WorkflowSlug: { _eq: slug } }, undefined, 1);
   if (bySlug.length > 0) {
     const updatePayload = buildUpdatePayload(bySlug[0]);
-    const updated = await dbUpdate('workflows', bySlug[0].id, updatePayload);
+    const updated = await dbUpdate('Workflows', bySlug[0].WorkflowID, updatePayload);
     return normalizeWorkflow(updated);
   }
 
   // Create new
   const createPayload: Record<string, any> = {
-    id: templateData.id || `wf_${slug}_${Date.now()}`,
-    name: templateData.name || 'New Workflow',
-    slug,
-    category: templateData.category || 'General',
-    description: templateData.description || 'Custom workflow process',
-    icon: templateData.icon || '⚡',
-    color: templateData.color || '#4F46E5',
-    version: templateData.version || 1,
-    published_version: templateData.published_version || 1,
-    sla_total_hours: templateData.sla_total_hours || 48,
-    react_flow_graph_json: passedGraph || null,
-    visibility_rules_json: passedVis || null,
-    steps_json: passedSteps || [],
-    fields_json: passedFields || [],
-    date_created: new Date().toISOString(),
-    date_updated: new Date().toISOString(),
+    WorkflowID: templateData.id || `wf_${slug}_${Date.now()}`,
+    WorkflowName: templateData.name || 'New Workflow',
+    WorkflowSlug: slug,
+    Category: templateData.category || 'General',
+    Description: templateData.description || 'Custom workflow process',
+    Icon: templateData.icon || '⚡',
+    Color: templateData.color || '#4F46E5',
+    Version: templateData.version || 1,
+    PublishedVersion: templateData.published_version || 1,
+    SlaTotalHours: templateData.sla_total_hours || 48,
+    ReactFlowGraphJson: passedGraph || null,
+    VisibilityRulesJson: passedVis || null,
+    StepsJson: passedSteps || [],
+    FieldsJson: passedFields || [],
+    DateCreated: new Date().toISOString(),
+    DateUpdated: new Date().toISOString(),
   };
 
-  const created = await dbCreate('workflows', createPayload);
+  const created = await dbCreate('Workflows', createPayload);
   return normalizeWorkflow(created);
 }
 
@@ -134,7 +134,7 @@ export async function saveWorkflowTemplate(
 export async function deleteWorkflowTemplate(id: string): Promise<boolean> {
   // Try direct hard-delete from database DB first
   try {
-    const res = await dbDelete('workflows', id);
+    const res = await dbDelete('Workflows', id);
     if (res) return true;
   } catch (e) {
     // Foreign key constraints on tickets table or REST API error
@@ -142,24 +142,24 @@ export async function deleteWorkflowTemplate(id: string): Promise<boolean> {
 
   // Fallback: Soft-delete archive (set status = 'archived' & is_archived = true)
   try {
-    await dbUpdate('workflows', id, {
-      status: 'archived',
-      is_archived: true,
-      date_updated: new Date().toISOString(),
+    await dbUpdate('Workflows', id, {
+      Status: 'archived',
+      IsArchived: true,
+      DateUpdated: new Date().toISOString(),
     });
     return true;
   } catch {
-    const rows = await dbGet('workflows', { slug: { _eq: id } }, undefined, 1);
+    const rows = await dbGet('Workflows', { WorkflowSlug: { _eq: id } }, undefined, 1);
     if (rows.length > 0) {
       try {
-        await dbDelete('workflows', rows[0].id);
+        await dbDelete('Workflows', rows[0].WorkflowID);
         return true;
       } catch {}
       try {
-        await dbUpdate('workflows', rows[0].id, {
-          status: 'archived',
-          is_archived: true,
-          date_updated: new Date().toISOString(),
+        await dbUpdate('Workflows', rows[0].WorkflowID, {
+          Status: 'archived',
+          IsArchived: true,
+          DateUpdated: new Date().toISOString(),
         });
         return true;
       } catch {}
@@ -173,32 +173,32 @@ export async function deleteWorkflowTemplate(id: string): Promise<boolean> {
  */
 export async function cloneWorkflowTemplate(id: string): Promise<WorkflowTemplateStore | null> {
   // Fetch original
-  let original = await dbGetOne<any>('workflows', id);
+  let original = await dbGetOne<any>('Workflows', id);
   if (!original) {
-    const bySlug = await dbGet('workflows', { slug: { _eq: id } }, undefined, 1);
+    const bySlug = await dbGet('Workflows', { WorkflowSlug: { _eq: id } }, undefined, 1);
     if (bySlug.length === 0) return null;
     original = bySlug[0];
   }
 
   const timestamp = Date.now();
   const clonePayload = {
-    name: `${original.name} (نسخة مُستنسخة)`,
-    slug: `${original.slug}-copy-${timestamp.toString().slice(-4)}`,
-    category: original.category,
-    description: original.description,
-    icon: original.icon,
-    color: original.color,
-    version: 1,
-    published_version: 1,
-    sla_total_hours: original.sla_total_hours,
-    react_flow_graph_json: original.react_flow_graph_json,
-    steps_json: original.steps_json || [],
-    fields_json: original.fields_json || [],
-    date_created: new Date().toISOString(),
-    date_updated: new Date().toISOString(),
+    WorkflowName: `${original.WorkflowName} (نسخة مُستنسخة)`,
+    WorkflowSlug: `${original.WorkflowSlug}-copy-${timestamp.toString().slice(-4)}`,
+    Category: original.Category,
+    Description: original.Description,
+    Icon: original.Icon,
+    Color: original.Color,
+    Version: 1,
+    PublishedVersion: 1,
+    SlaTotalHours: original.SlaTotalHours,
+    ReactFlowGraphJson: original.ReactFlowGraphJson,
+    StepsJson: original.StepsJson || [],
+    FieldsJson: original.FieldsJson || [],
+    DateCreated: new Date().toISOString(),
+    DateUpdated: new Date().toISOString(),
   };
 
-  const created = await dbCreate('workflows', clonePayload);
+  const created = await dbCreate('Workflows', clonePayload);
   return normalizeWorkflow(created);
 }
 
@@ -239,10 +239,18 @@ export function canUserAccessTicket(
   const assignedTech = (ticket.assigned_user || '').toLowerCase();
   const currentApprover = (ticket.current_approver || '').toLowerCase();
 
+  // Loose substring match so display names that include job titles (e.g. "Huda Adel (Accounts Staff)")
+  // still resolve to the user by id/email/name even when they differ slightly.
+  const involvedIn =
+    (val: string) =>
+      (userId && val.includes(userId)) ||
+      (userEmail && val.includes(userEmail)) ||
+      (userName && val.includes(userName));
+
   if (
     isAssignedGroupOrUser ||
-    (assignedTech && (assignedTech === userId || assignedTech === userEmail || assignedTech === userName)) ||
-    (currentApprover && (currentApprover === userId || currentApprover === userEmail || currentApprover === userName))
+    (assignedTech && involvedIn(assignedTech)) ||
+    (currentApprover && involvedIn(currentApprover))
   ) {
     return true;
   }
@@ -343,10 +351,15 @@ export function isTicketInvolved(ticket: WorkflowRequest, user: { id?: string; n
   if (assignees.some((a) => a && (a.includes(userId) || a.includes(userEmail) || a.includes(userName)))) return true;
 
   const assignedUser = (ticket.assigned_user || '').toLowerCase();
-  if (assignedUser && (assignedUser === userId || assignedUser === userEmail || assignedUser === userName)) return true;
+  const involvedIn =
+    (val: string) =>
+      (userId && val.includes(userId)) ||
+      (userEmail && val.includes(userEmail)) ||
+      (userName && val.includes(userName));
+  if (assignedUser && involvedIn(assignedUser)) return true;
 
   const currentApprover = (ticket.current_approver || '').toLowerCase();
-  if (currentApprover && (currentApprover === userId || currentApprover === userEmail || currentApprover === userName)) return true;
+  if (currentApprover && involvedIn(currentApprover)) return true;
 
   const observers = (ticket.observer_id || '').toLowerCase();
   if (observers && (userId && observers.includes(userId) || userEmail && observers.includes(userEmail) || userName && observers.includes(userName))) return true;
@@ -384,13 +397,13 @@ export async function addObserversToTicket(ticketId: string, observerIdentifiers
   // Insert each observer if not exists
   for (const obs of uniq) {
     try {
-      const existing = await dbGet('ticket_observers', { ticket_id: { _eq: ticketId }, user_id: { _eq: obs } }, undefined, 1);
+      const existing = await dbGet('TicketObservers', { TicketID: { _eq: ticketId }, UserID: { _eq: obs } }, undefined, 1);
       if (!existing || existing.length === 0) {
-        await dbCreate('ticket_observers', {
-          id: `to_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          ticket_id: ticketId,
-          user_id: obs,
-          added_at: new Date().toISOString(),
+        await dbCreate('TicketObservers', {
+          TicketObserverID: `to_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          TicketID: ticketId,
+          UserID: obs,
+          AddedAt: new Date().toISOString(),
         });
       }
     } catch (e) {
@@ -401,11 +414,11 @@ export async function addObserversToTicket(ticketId: string, observerIdentifiers
 
   // Rebuild legacy comma-separated observer_id field for backward compatibility
   try {
-    const rows = await dbGet('ticket_observers', { ticket_id: { _eq: ticketId } });
-    const ids = (rows || []).map((r: any) => String(r.user_id)).filter(Boolean);
+    const rows = await dbGet('TicketObservers', { TicketID: { _eq: ticketId } });
+    const ids = (rows || []).map((r: any) => String(r.UserID)).filter(Boolean);
     const joined = ids.join(', ');
     try {
-      await dbUpdate('tickets', ticketId, { observer_id: joined, date_updated: new Date().toISOString() });
+      await dbUpdate('Tickets', ticketId, { ObserverUserID: joined, DateUpdated: new Date().toISOString() });
     } catch (e) {
       // ignore
     }
@@ -524,38 +537,38 @@ export async function submitRequest(params: {
   // 2. Create ticket in database
   const ticketId = `tck_${reqNumber.toLowerCase().replace(/[^a-z0-9]/g, '')}_${Date.now()}`;
   const ticketPayload = {
-    id: ticketId,
-    ticket_number: reqNumber,
-    workflow_id: wf.id,
-    workflow_version: wf.published_version,
-    workflow_snapshot_json: wf.steps,
-    requester_id: requester,
-    requester_name: requesterName,
-    requester_department_id: requesterDept,
-    title: params.title || `${wf.name} — ${reqNumber}`,
-    priority: params.priority || panelCfg.defaultPriority || 'normal',
-    status: 'pending',
-    current_step_node_id: firstNodeId,
-    current_step_order: firstStep?.step_order || 1,
-    current_assignees_json: [firstAssignee],
-    assigned_group: resolvedGroup || '',
-    assigned_user: defaultUser || '',
+    TicketID: ticketId,
+    TicketNumber: reqNumber,
+    WorkflowID: wf.id,
+    WorkflowVersion: wf.published_version,
+    WorkflowSnapshotJson: wf.steps,
+    RequesterUserID: requester,
+    RequesterName: requesterName,
+    RequesterDepartmentID: requesterDept,
+    Title: params.title || `${wf.name} — ${reqNumber}`,
+    Priority: params.priority || panelCfg.defaultPriority || 'normal',
+    Status: 'pending',
+    CurrentStepNodeID: firstNodeId,
+    CurrentStepOrder: firstStep?.step_order || 1,
+    CurrentAssigneesJson: [firstAssignee],
+    AssignedGroup: resolvedGroup || '',
+    AssignedUser: defaultUser || '',
     // Workflow Target Audience (Target Business Groups / Target Departments) — gates ticket visibility
-    target_group_ids_json: (wf.visibility_rules as any)?.group_ids || (wf as any).visibility_rules_json?.group_ids || [],
-    target_department_ids_json: (wf.visibility_rules as any)?.department_ids || (wf as any).visibility_rules_json?.department_ids || [],
-    location_id: resolvedLocation || '',
-    unit: resolvedUnit || '',
-    submitted_at: new Date().toISOString(),
-    sla_deadline: slaDeadline,
-    sla_tto_deadline: slaTtoDeadline,
-    sla_ttr_deadline: slaTtrDeadline,
-    ola_deadline: olaDeadline,
-    ola_accumulated_pause_ms: 0,
-    date_created: new Date().toISOString(),
-    date_updated: new Date().toISOString(),
+    TargetGroupIDsJson: (wf.visibility_rules as any)?.group_ids || (wf as any).visibility_rules_json?.group_ids || [],
+    TargetDepartmentIDsJson: (wf.visibility_rules as any)?.department_ids || (wf as any).visibility_rules_json?.department_ids || [],
+    LocationID: resolvedLocation || '',
+    Unit: resolvedUnit || '',
+    SubmittedAt: new Date().toISOString(),
+    SlaDeadline: slaDeadline,
+    SlaTtoDeadline: slaTtoDeadline,
+    SlaTtrDeadline: slaTtrDeadline,
+    OlaDeadline: olaDeadline,
+    OlaAccumulatedPauseMs: 0,
+    DateCreated: new Date().toISOString(),
+    DateUpdated: new Date().toISOString(),
   };
 
-  const createdTicket = await dbCreate('tickets', ticketPayload);
+  const createdTicket = await dbCreate('Tickets', ticketPayload);
 
   // 3. Create EAV field values in database
   const finalEavMap: Record<string, any> = {
@@ -572,51 +585,51 @@ export async function submitRequest(params: {
 
   for (const [key, val] of Object.entries(finalEavMap)) {
     if (val === undefined || val === null || val === '') continue;
-    await dbCreate('ticket_values', {
-      id: `val_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      ticket_id: createdTicket.id || ticketId,
-      field_key: key,
-      value_text: typeof val === 'string' ? val : JSON.stringify(val),
-      value_number: typeof val === 'number' ? val : (!isNaN(Number(val)) ? Number(val) : null),
+    await dbCreate('TicketValues', {
+      TicketValueID: `val_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      TicketID: createdTicket.TicketID || ticketId,
+      FieldKey: key,
+      ValueText: typeof val === 'string' ? val : JSON.stringify(val),
+      ValueNumber: typeof val === 'number' ? val : (!isNaN(Number(val)) ? Number(val) : null),
     });
   }
 
   // 4. Create initial audit log entry
   const logPayload = {
-    id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    ticket_id: createdTicket.id || ticketId,
-    step_node_id: firstNodeId,
-    step_order_snapshot: 1,
-    actor_id: params.requesterId || 'user_ahmed',
-    actor_name: params.requesterName || params.requesterId || 'Ahmed Mohamed',
-    action: 'submitted',
-    comments: 'Request submitted and routed automatically to first approval step.',
-    decision_at: new Date().toISOString(),
+    ApprovalLogID: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    TicketID: createdTicket.TicketID || ticketId,
+    StepNodeID: firstNodeId,
+    StepOrderSnapshot: 1,
+    ActorUserID: params.requesterId || 'user_ahmed',
+    ActorUserName: params.requesterName || params.requesterId || 'Ahmed Mohamed',
+    Action: 'submitted',
+    Comments: 'Request submitted and routed automatically to first approval step.',
+    DecisionAt: new Date().toISOString(),
   };
 
-  const createdLog = await dbCreate('approval_log', logPayload);
+  const createdLog = await dbCreate('ApprovalLog', logPayload);
 
   // Create OLA started log for Activity Timeline
   const firstOlaStr = firstOlaHours > 0 ? `${Math.round(firstOlaHours)}h ${firstOlaMinutes > 0 ? `${firstOlaMinutes}m` : ''}` : `${firstOlaMinutes}m`;
-  await dbCreate('approval_log', {
-    id: `log_ola_start_${Date.now()}`,
-    ticket_id: createdTicket.id || ticketId,
-    actor_id: 'System',
-    actor_name: 'OLA Tracker',
-    action: 'ola_started',
-    comments: `[OLA Tracker]: Active Step OLA for "${firstStep?.name || 'First Step'}" started. Target: ${firstOlaStr}. Deadline is ${new Date(olaDeadline).toLocaleString()}.`,
-    decision_at: new Date().toISOString(),
+  await dbCreate('ApprovalLog', {
+    ApprovalLogID: `log_ola_start_${Date.now()}`,
+    TicketID: createdTicket.TicketID || ticketId,
+    ActorUserID: 'System',
+    ActorUserName: 'OLA Tracker',
+    Action: 'ola_started',
+    Comments: `[OLA Tracker]: Active Step OLA for "${firstStep?.name || 'First Step'}" started. Target: ${firstOlaStr}. Deadline is ${new Date(olaDeadline).toLocaleString()}.`,
+    DecisionAt: new Date().toISOString(),
   });
 
   // Create SLA started log for Activity Timeline
-  await dbCreate('approval_log', {
-    id: `log_sla_start_${Date.now()}`,
-    ticket_id: createdTicket.id || ticketId,
-    actor_id: 'System',
-    actor_name: 'SLA Tracker',
-    action: 'sla_started',
-    comments: `[SLA Tracker]: SLA timers initiated. TTO Target: ${panelCfg.defaultSlaTto || '1 Hour'}, TTR Target: ${panelCfg.defaultSlaTtr || '8 Hours'}.`,
-    decision_at: new Date().toISOString(),
+  await dbCreate('ApprovalLog', {
+    ApprovalLogID: `log_sla_start_${Date.now()}`,
+    TicketID: createdTicket.TicketID || ticketId,
+    ActorUserID: 'System',
+    ActorUserName: 'SLA Tracker',
+    Action: 'sla_started',
+    Comments: `[SLA Tracker]: SLA timers initiated. TTO Target: ${panelCfg.defaultSlaTto || '1 Hour'}, TTR Target: ${panelCfg.defaultSlaTtr || '8 Hours'}.`,
+    DecisionAt: new Date().toISOString(),
   });
 
   // A visual workflow is a graph, not an ordered list. Traverse its trigger and
@@ -629,13 +642,13 @@ export async function submitRequest(params: {
   if (defaultObservers) {
     initialObservers.push(...defaultObservers.split(',').map(s => s.trim()).filter(Boolean));
   }
-  if (runtimeTicket.observer_id) {
-    initialObservers.push(...runtimeTicket.observer_id.split(',').map((s: string) => s.trim()).filter(Boolean));
+  if (runtimeTicket.ObserverUserID ?? runtimeTicket.observer_id) {
+    initialObservers.push(...String(runtimeTicket.ObserverUserID ?? runtimeTicket.observer_id).split(',').map((s: string) => s.trim()).filter(Boolean));
   }
   const uniqueObservers = Array.from(new Set(initialObservers));
 
   try {
-    await addObserversToTicket(runtimeTicket.id || ticketId, uniqueObservers);
+    await addObserversToTicket((runtimeTicket.TicketID ?? runtimeTicket.id) || ticketId, uniqueObservers);
   } catch (e) {
     // Non-fatal — observer persistence should not block ticket creation
     console.warn('[addObserversToTicket failed]', e);
@@ -649,8 +662,8 @@ export async function submitRequest(params: {
   void notify({
     eventType: 'request_submitted',
     ticket: runtimeTicket,
-    ticketId: runtimeTicket.id || ticketId,
-    ticketNumber: runtimeTicket.ticket_number || reqNumber,
+    ticketId: (runtimeTicket.TicketID ?? runtimeTicket.id) || ticketId,
+    ticketNumber: (runtimeTicket.TicketNumber ?? runtimeTicket.ticket_number) || reqNumber,
     actorId: requesterIdForNotify,
     actorName: requesterNameForNotify,
     step: firstStep,
@@ -683,13 +696,13 @@ export async function getRequests(
 }> {
   // Build database filter
   const databaseFilter: Record<string, any> = {};
-  if (filter?.status) databaseFilter.status = { _eq: filter.status };
-  if (filter?.requesterId) databaseFilter.requester_id = { _eq: filter.requesterId };
+  if (filter?.status) databaseFilter.Status = { _eq: filter.status };
+  if (filter?.requesterId) databaseFilter.RequesterUserID = { _eq: filter.requesterId };
 
   const ticketRows = await dbGet(
-    'tickets',
+    'Tickets',
     Object.keys(databaseFilter).length > 0 ? databaseFilter : undefined,
-    '-date_created'
+    '-DateCreated'
   );
 
   let requests = ticketRows.map(normalizeTicket);
@@ -705,14 +718,14 @@ export async function getRequests(
 
   for (const req of requests) {
     // Fetch EAV values for this ticket
-    const vals = await dbGet('ticket_values', { ticket_id: { _eq: req.id } });
+    const vals = await dbGet('TicketValues', { TicketID: { _eq: req.id } });
     valuesMap[req.id] = vals.reduce((acc: Record<string, any>, curr: any) => {
-      acc[curr.field_key] = curr.value_number != null ? curr.value_number : curr.value_text;
+      acc[curr.FieldKey] = curr.ValueNumber != null ? curr.ValueNumber : curr.ValueText;
       return acc;
     }, {});
 
     // Fetch approval logs for this ticket
-    const logs = await dbGet('approval_log', { ticket_id: { _eq: req.id } }, 'decision_at');
+    const logs = await dbGet('ApprovalLog', { TicketID: { _eq: req.id } }, 'DecisionAt');
     logsMap[req.id] = logs.map(normalizeApprovalLog);
   }
 
@@ -732,10 +745,10 @@ export async function getRequestById(
   logs: ApprovalLogEntry[];
 } | null> {
   // Try to find ticket by id
-  let ticket = await dbGetOne<any>('tickets', id);
+  let ticket = await dbGetOne<any>('Tickets', id);
   if (!ticket) {
     // Try by ticket_number
-    const byNumber = await dbGet('tickets', { ticket_number: { _eq: id } }, undefined, 1);
+    const byNumber = await dbGet('Tickets', { TicketNumber: { _eq: id } }, undefined, 1);
     if (byNumber.length === 0) return null;
     ticket = byNumber[0];
   }
@@ -750,7 +763,7 @@ export async function getRequestById(
   // Get associated workflow
   let workflow: WorkflowTemplateStore;
   if (request.workflow_id) {
-    const wfRow = await dbGetOne<any>('workflows', request.workflow_id);
+    const wfRow = await dbGetOne<any>('Workflows', request.workflow_id);
     workflow = wfRow ? normalizeWorkflow(wfRow) : {
       id: request.workflow_id,
       name: 'Workflow Process',
@@ -783,14 +796,14 @@ export async function getRequestById(
   }
 
   // Get EAV values
-  const vals = await dbGet('ticket_values', { ticket_id: { _eq: ticket.id } });
+  const vals = await dbGet('TicketValues', { TicketID: { _eq: ticket.TicketID } });
   const values = vals.reduce((acc: Record<string, any>, curr: any) => {
-    acc[curr.field_key] = curr.value_number != null ? curr.value_number : curr.value_text;
+    acc[curr.FieldKey] = curr.ValueNumber != null ? curr.ValueNumber : curr.ValueText;
     return acc;
   }, {});
 
   // Get approval logs
-  const logRows = await dbGet('approval_log', { ticket_id: { _eq: ticket.id } }, 'decision_at');
+  const logRows = await dbGet('ApprovalLog', { TicketID: { _eq: ticket.TicketID } }, 'DecisionAt');
   const logs = logRows.map(normalizeApprovalLog);
 
   // Check for SLA/OLA breaches and log them if they haven't been logged yet
@@ -806,15 +819,15 @@ export async function getRequestById(
       const alreadyLoggedTto = logs.some((l: any) => l.action === 'sla_breached' && l.comments?.includes('TTO'));
       if (!alreadyLoggedTto) {
         const breachLog = {
-          id: `log_tto_breach_${Date.now()}`,
-          ticket_id: ticket.id,
-          action: 'sla_breached',
-          actor_id: 'System',
-          actor_name: 'SLA Tracker',
-          comments: `[Breach Alert] SLA TTO (Takeover) target has breached! Deadline was ${new Date(request.sla_tto_deadline).toLocaleString()}.`,
-          decision_at: now.toISOString(),
+          ApprovalLogID: `log_tto_breach_${Date.now()}`,
+          TicketID: ticket.TicketID,
+          Action: 'sla_breached',
+          ActorUserID: 'System',
+          ActorUserName: 'SLA Tracker',
+          Comments: `[Breach Alert] SLA TTO (Takeover) target has breached! Deadline was ${new Date(request.sla_tto_deadline).toLocaleString()}.`,
+          DecisionAt: now.toISOString(),
         };
-        const createdLog = await dbCreate('approval_log', breachLog);
+        const createdLog = await dbCreate('ApprovalLog', breachLog);
         updatedLogs.push(normalizeApprovalLog(createdLog));
       }
     }
@@ -825,15 +838,15 @@ export async function getRequestById(
       const alreadyLoggedTtr = logs.some((l: any) => l.action === 'sla_breached' && l.comments?.includes('TTR'));
       if (!alreadyLoggedTtr) {
         const breachLog = {
-          id: `log_ttr_breach_${Date.now()}`,
-          ticket_id: ticket.id,
-          action: 'sla_breached',
-          actor_id: 'System',
-          actor_name: 'SLA Tracker',
-          comments: `[Breach Alert] SLA TTR (Resolution) target has breached! Deadline was ${new Date(ttrDeadline).toLocaleString()}.`,
-          decision_at: now.toISOString(),
+          ApprovalLogID: `log_ttr_breach_${Date.now()}`,
+          TicketID: ticket.TicketID,
+          Action: 'sla_breached',
+          ActorUserID: 'System',
+          ActorUserName: 'SLA Tracker',
+          Comments: `[Breach Alert] SLA TTR (Resolution) target has breached! Deadline was ${new Date(ttrDeadline).toLocaleString()}.`,
+          DecisionAt: now.toISOString(),
         };
-        const createdLog = await dbCreate('approval_log', breachLog);
+        const createdLog = await dbCreate('ApprovalLog', breachLog);
         updatedLogs.push(normalizeApprovalLog(createdLog));
       }
     }
@@ -845,15 +858,15 @@ export async function getRequestById(
       const alreadyLoggedOla = logs.some((l: any) => l.action === 'ola_breached' && l.comments?.includes(`"${stepName}"`));
       if (!alreadyLoggedOla) {
         const breachLog = {
-          id: `log_ola_breach_${Date.now()}`,
-          ticket_id: ticket.id,
-          action: 'ola_breached',
-          actor_id: 'System',
-          actor_name: 'OLA Tracker',
-          comments: `[Breach Alert] Active Step OLA for "${stepName}" has breached! Deadline was ${new Date(request.ola_deadline).toLocaleString()}.`,
-          decision_at: now.toISOString(),
+          ApprovalLogID: `log_ola_breach_${Date.now()}`,
+          TicketID: ticket.TicketID,
+          Action: 'ola_breached',
+          ActorUserID: 'System',
+          ActorUserName: 'OLA Tracker',
+          Comments: `[Breach Alert] Active Step OLA for "${stepName}" has breached! Deadline was ${new Date(request.ola_deadline).toLocaleString()}.`,
+          DecisionAt: now.toISOString(),
         };
-        const createdLog = await dbCreate('approval_log', breachLog);
+        const createdLog = await dbCreate('ApprovalLog', breachLog);
         updatedLogs.push(normalizeApprovalLog(createdLog));
       }
     }
@@ -872,9 +885,9 @@ export async function processApprovalAction(params: {
   comments?: string;
 }): Promise<{ request: WorkflowRequest; log: ApprovalLogEntry }> {
   // 1. Find ticket in database
-  let ticket = await dbGetOne<any>('tickets', params.requestId);
+  let ticket = await dbGetOne<any>('Tickets', params.requestId);
   if (!ticket) {
-    const byNumber = await dbGet('tickets', { ticket_number: { _eq: params.requestId } }, undefined, 1);
+    const byNumber = await dbGet('Tickets', { TicketNumber: { _eq: params.requestId } }, undefined, 1);
     if (byNumber.length === 0) {
       throw new Error(`Request ${params.requestId} not found in database`);
     }
@@ -883,20 +896,20 @@ export async function processApprovalAction(params: {
 
   // Use the persisted canvas graph when available. Older workflows without a
   // graph continue through the legacy ordered-step engine below.
-  const wf = await dbGetOne<any>('workflows', ticket.workflow_id);
+  const wf = await dbGetOne<any>('Workflows', ticket.WorkflowID);
   if (wf) {
     const runtime = await continueGraphWorkflow(ticket, wf, params.action);
     if (runtime.handled) {
-      const log = await dbCreate('approval_log', {
-        id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        ticket_id: ticket.id,
-        step_node_id: runtime.ticket.current_step_node_id,
-        step_order_snapshot: runtime.ticket.current_step_order,
-        actor_id: params.actorName || 'Approver',
-        actor_name: params.actorName || 'Approver',
-        action: params.action,
-        comments: params.comments || `Action ${params.action} recorded.`,
-        decision_at: new Date().toISOString(),
+      const log = await dbCreate('ApprovalLog', {
+        ApprovalLogID: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        TicketID: ticket.TicketID,
+        StepNodeID: runtime.ticket.current_step_node_id,
+        StepOrderSnapshot: runtime.ticket.current_step_order,
+        ActorUserID: params.actorName || 'Approver',
+        ActorUserName: params.actorName || 'Approver',
+        Action: params.action,
+        Comments: params.comments || `Action ${params.action} recorded.`,
+        DecisionAt: new Date().toISOString(),
       });
 
       const step = (wf.steps_json || []).find(
@@ -913,18 +926,18 @@ export async function processApprovalAction(params: {
     }
   }
 
-  const steps = ticket.workflow_snapshot_json || [];
+  const steps = (ticket.WorkflowSnapshotJson ?? ticket.workflow_snapshot_json) || [];
   const currentStepIdx = steps.findIndex(
-    (s: any) => s.react_flow_node_id === ticket.current_step_node_id || s.step_order === ticket.current_step_order
+    (s: any) => s.react_flow_node_id === (ticket.CurrentStepNodeID ?? ticket.current_step_node_id) || s.step_order === (ticket.CurrentStepOrder ?? ticket.current_step_order)
   );
 
-  let newStatus = ticket.status;
-  let nextNodeId = ticket.current_step_node_id;
-  let nextOrder = ticket.current_step_order;
-  let newAssignees = ticket.current_assignees_json || [];
+  let newStatus = ticket.Status ?? ticket.status;
+  let nextNodeId = ticket.CurrentStepNodeID ?? ticket.current_step_node_id;
+  let nextOrder = ticket.CurrentStepOrder ?? ticket.current_step_order;
+  let newAssignees = (ticket.CurrentAssigneesJson ?? ticket.current_assignees_json) || [];
   let solvedAt: string | null = null;
   let closedAt: string | null = null;
-  let olaDeadline = ticket.ola_deadline;
+  let olaDeadline = ticket.OlaDeadline ?? ticket.ola_deadline;
 
   if ((params.action as string) === 'cancelled') {
     newStatus = 'cancelled';
@@ -954,7 +967,7 @@ export async function processApprovalAction(params: {
   }
 
   // Combine existing observers with acting approver and new assignees
-  const currentObservers = (ticket.observer_id || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+  const currentObservers = ((ticket.ObserverUserID ?? ticket.observer_id) || '').split(',').map((s: string) => s.trim()).filter(Boolean);
   const updatedObservers = Array.from(new Set([
     ...currentObservers,
     params.actorName,
@@ -963,24 +976,24 @@ export async function processApprovalAction(params: {
 
   // 2. Update ticket in database
   const ticketUpdate: Record<string, any> = {
-    status: newStatus,
-    current_step_node_id: nextNodeId,
-    current_step_order: nextOrder,
-    current_assignees_json: newAssignees,
-    observer_id: updatedObservers,
-    ola_deadline: olaDeadline,
-    date_updated: new Date().toISOString(),
+    Status: newStatus,
+    CurrentStepNodeID: nextNodeId,
+    CurrentStepOrder: nextOrder,
+    CurrentAssigneesJson: newAssignees,
+    ObserverUserID: updatedObservers,
+    OlaDeadline: olaDeadline,
+    DateUpdated: new Date().toISOString(),
   };
-  if (solvedAt) ticketUpdate.solved_at = solvedAt;
-  if (closedAt) ticketUpdate.closed_at = closedAt;
+  if (solvedAt) ticketUpdate.SolvedAt = solvedAt;
+  if (closedAt) ticketUpdate.ClosedAt = closedAt;
 
-  const updatedTicket = await dbUpdate('tickets', ticket.id, ticketUpdate);
+  const updatedTicket = await dbUpdate('Tickets', ticket.TicketID ?? ticket.id, ticketUpdate);
 
   // 3. Create approval log entry
   const currentStep = steps[currentStepIdx];
   const currentOlaHours = currentStep?.ola_hours ?? 4;
   const currentOlaMinutes = currentStep?.ola_minutes ?? 0;
-  const stepStart = ticket.date_updated ? new Date(ticket.date_updated).getTime() : new Date(ticket.date_created).getTime();
+  const stepStart = (ticket.DateUpdated ?? ticket.date_updated) ? new Date(ticket.DateUpdated ?? ticket.date_updated).getTime() : new Date(ticket.DateCreated ?? ticket.date_created).getTime();
   const elapsedMs = Date.now() - stepStart;
   const elapsedMins = Math.round(elapsedMs / 60000);
   const elapsedStr = elapsedMins >= 60 ? `${Math.floor(elapsedMins / 60)}h ${elapsedMins % 60}m` : `${elapsedMins}m`;
@@ -988,27 +1001,27 @@ export async function processApprovalAction(params: {
   let appendComments = `\n\n[OLA Tracker]: Step "${currentStep?.name || 'Approval Step'}" OLA completed. Time taken: ${elapsedStr}. Target was: ${currentOlaHours > 0 ? `${Math.round(currentOlaHours)}h` : ''} ${currentOlaMinutes > 0 ? `${currentOlaMinutes}m` : ''}.`;
 
   if (newStatus === 'approved') {
-    const totalSlaStart = new Date(ticket.date_created).getTime();
+    const totalSlaStart = new Date(ticket.DateCreated ?? ticket.date_created).getTime();
     const totalSlaElapsedMs = Date.now() - totalSlaStart;
     const totalSlaElapsedMins = Math.round(totalSlaElapsedMs / 60000);
     const totalSlaElapsedStr = totalSlaElapsedMins >= 60 ? `${Math.floor(totalSlaElapsedMins / 60)}h ${totalSlaElapsedMins % 60}m` : `${totalSlaElapsedMins}m`;
-    const slaTargetHours = wf.sla_total_hours || 48;
+    const slaTargetHours = (wf?.SlaTotalHours ?? wf?.sla_total_hours) || 48;
     appendComments += `\n[SLA Tracker]: Ticket Resolution SLA completed. Time taken: ${totalSlaElapsedStr}. Target was: ${slaTargetHours}h.`;
   }
 
   const logPayload = {
-    id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    ticket_id: ticket.id,
-    step_node_id: nextNodeId,
-    step_order_snapshot: nextOrder,
-    actor_id: params.actorName || 'Approver',
-    actor_name: params.actorName || 'Approver',
-    action: params.action,
-    comments: (params.comments || `Action ${params.action} recorded.`) + appendComments,
-    decision_at: new Date().toISOString(),
+    ApprovalLogID: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    TicketID: ticket.TicketID ?? ticket.id,
+    StepNodeID: nextNodeId,
+    StepOrderSnapshot: nextOrder,
+    ActorUserID: params.actorName || 'Approver',
+    ActorUserName: params.actorName || 'Approver',
+    Action: params.action,
+    Comments: (params.comments || `Action ${params.action} recorded.`) + appendComments,
+    DecisionAt: new Date().toISOString(),
   };
 
-  const createdLog = await dbCreate('approval_log', logPayload);
+  const createdLog = await dbCreate('ApprovalLog', logPayload);
 
   // Create OLA started log for next step
   const nextStep = steps[currentStepIdx + 1];
@@ -1016,34 +1029,34 @@ export async function processApprovalAction(params: {
     const nextOlaHours = nextStep.ola_hours ?? 4;
     const nextOlaMinutes = nextStep.ola_minutes ?? 0;
     const nextOlaStr = nextOlaHours > 0 ? `${Math.round(nextOlaHours)}h ${nextOlaMinutes > 0 ? `${nextOlaMinutes}m` : ''}` : `${nextOlaMinutes}m`;
-    await dbCreate('approval_log', {
-      id: `log_ola_next_start_${Date.now()}`,
-      ticket_id: ticket.id,
-      actor_id: 'System',
-      actor_name: 'OLA Tracker',
-      action: 'ola_started',
-      comments: `[OLA Tracker]: Active Step OLA for "${nextStep.name || 'Next Step'}" started. Target: ${nextOlaStr}. Deadline is ${new Date(olaDeadline).toLocaleString()}.`,
-      decision_at: new Date().toISOString(),
+    await dbCreate('ApprovalLog', {
+      ApprovalLogID: `log_ola_next_start_${Date.now()}`,
+      TicketID: ticket.TicketID ?? ticket.id,
+      ActorUserID: 'System',
+      ActorUserName: 'OLA Tracker',
+      Action: 'ola_started',
+      Comments: `[OLA Tracker]: Active Step OLA for "${nextStep.name || 'Next Step'}" started. Target: ${nextOlaStr}. Deadline is ${new Date(olaDeadline).toLocaleString()}.`,
+      DecisionAt: new Date().toISOString(),
     });
   }
 
   // Persist actor and new assignees as observers for normalized queries
   try {
-    await addObserversToTicket(updatedTicket.id, Array.from(new Set([String(params.actorName), ...(newAssignees || [])])));
+    await addObserversToTicket(updatedTicket.TicketID ?? updatedTicket.id, Array.from(new Set([String(params.actorName), ...(newAssignees || [])])));
   } catch (e) {
     console.warn('[addObserversToTicket after approval failed]', e);
   }
 
   // ── Notification: approval decision (legacy ordered-step engine)
   const currentStepForNotify = steps.find(
-    (s: any) => s.react_flow_node_id === ticket.current_step_node_id || s.step_order === ticket.current_step_order
+    (s: any) => s.react_flow_node_id === (ticket.CurrentStepNodeID ?? ticket.current_step_node_id) || s.step_order === (ticket.CurrentStepOrder ?? ticket.current_step_order)
   );
   await emitApprovalNotification(updatedTicket, wf, params.action, params.actorName || 'Approver', currentStepForNotify);
 
   // If the request advanced to another approval step, alert the new approver.
   if (params.action === 'approved') {
     const nextStepForNotify = steps.find(
-      (s: any) => s.react_flow_node_id === updatedTicket.current_step_node_id || s.step_order === updatedTicket.current_step_order
+      (s: any) => s.react_flow_node_id === (updatedTicket.CurrentStepNodeID ?? updatedTicket.current_step_node_id) || s.step_order === (updatedTicket.CurrentStepOrder ?? updatedTicket.current_step_order)
     );
     await emitApprovalRequested(updatedTicket, wf, params.actorName || 'Approver', nextStepForNotify);
   }
@@ -1079,12 +1092,12 @@ async function emitApprovalNotification(
   await notify({
     eventType,
     ticket,
-    ticketId: ticket.id,
-    ticketNumber: ticket.ticket_number,
+    ticketId: ticket.TicketID ?? ticket.id,
+    ticketNumber: ticket.TicketNumber ?? ticket.ticket_number,
     actorId: actorName,
     actorName,
     step,
-    metadata: { workflowName: wf?.name },
+    metadata: { workflowName: wf?.WorkflowName ?? wf?.name },
   });
 }
 
@@ -1101,12 +1114,12 @@ async function emitApprovalRequested(
   await notify({
     eventType: 'approval_requested',
     ticket,
-    ticketId: ticket.id,
-    ticketNumber: ticket.ticket_number,
+    ticketId: ticket.TicketID ?? ticket.id,
+    ticketNumber: ticket.TicketNumber ?? ticket.ticket_number,
     actorId: actorName,
     actorName,
     step,
-    metadata: { workflowName: wf?.name },
+    metadata: { workflowName: wf?.WorkflowName ?? wf?.name },
   });
 }
 
@@ -1131,17 +1144,17 @@ export async function addComment(params: {
     commentText = commentText + '\n' + attachmentJson;
   }
   const logPayload: Record<string, any> = {
-    id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    ticket_id: params.ticketId,
-    step_node_id: null,
-    step_order_snapshot: null,
-    actor_id: params.actorId,
-    actor_name: params.actorName,
-    action: params.isInternal ? 'internal_note' : 'commented',
-    comments: commentText,
-    decision_at: new Date().toISOString(),
+    ApprovalLogID: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    TicketID: params.ticketId,
+    StepNodeID: null,
+    StepOrderSnapshot: null,
+    ActorUserID: params.actorId,
+    ActorUserName: params.actorName,
+    Action: params.isInternal ? 'internal_note' : 'commented',
+    Comments: commentText,
+    DecisionAt: new Date().toISOString(),
   };
-  const created = await dbCreate('approval_log', logPayload);
+  const created = await dbCreate('ApprovalLog', logPayload);
 
   // ── Notification: public comment / internal note
   if (params.skipNotification) {
@@ -1150,12 +1163,12 @@ export async function addComment(params: {
   if (!params.isInternal) {
     // enrichment: load ticket row for targeting
     try {
-      const ticketRow = await dbGetOne<any>('tickets', params.ticketId);
+      const ticketRow = await dbGetOne<any>('Tickets', params.ticketId);
       void notify({
         eventType: 'comment_added',
-        ticket: ticketRow || { id: params.ticketId, requester_id: params.actorId },
+        ticket: ticketRow || { TicketID: params.ticketId, RequesterUserID: params.actorId },
         ticketId: params.ticketId,
-        ticketNumber: ticketRow?.ticket_number,
+        ticketNumber: ticketRow?.TicketNumber,
         actorId: params.actorId,
         actorName: params.actorName,
       });
@@ -1164,12 +1177,12 @@ export async function addComment(params: {
     }
   } else {
     try {
-      const ticketRow = await dbGetOne<any>('tickets', params.ticketId);
+      const ticketRow = await dbGetOne<any>('Tickets', params.ticketId);
       void notify({
         eventType: 'internal_note_added',
-        ticket: ticketRow || { id: params.ticketId, requester_id: params.actorId },
+        ticket: ticketRow || { TicketID: params.ticketId, RequesterUserID: params.actorId },
         ticketId: params.ticketId,
-        ticketNumber: ticketRow?.ticket_number,
+        ticketNumber: ticketRow?.TicketNumber,
         actorId: params.actorId,
         actorName: params.actorName,
       });

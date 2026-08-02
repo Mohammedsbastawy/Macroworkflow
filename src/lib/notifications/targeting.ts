@@ -23,11 +23,15 @@ let deptsCache: any[] | null = null;
 async function getUsers(): Promise<any[]> {
   if (usersCache) return usersCache;
   try {
-    const rows = await dbGet('system_users');
+    const rows = await dbGet('Users');
     usersCache = rows.map((u: any) => ({
-      ...u,
-      group_ids: u.group_ids_json || [],
-      roles: u.roles_json || (u.roles ? (Array.isArray(u.roles) ? u.roles : [u.role]) : [u.role || 'selfservice']),
+      id: u.UserID ?? u.id,
+      name: u.UserName ?? u.name,
+      email: u.UserEmail ?? u.email,
+      role: u.Role ?? u.role ?? 'selfservice',
+      roles: u.RolesJson ?? u.roles_json ?? (u.Roles ? (Array.isArray(u.Roles) ? u.Roles : [u.Role]) : [u.Role ?? 'selfservice']),
+      department_id: u.DepartmentID ?? u.department_id,
+      group_ids: u.GroupIDsJson ?? u.group_ids_json ?? [],
     }));
   } catch (e) {
     usersCache = [];
@@ -38,9 +42,11 @@ async function getUsers(): Promise<any[]> {
 async function getGroups(): Promise<any[]> {
   if (groupsCache) return groupsCache;
   try {
-    groupsCache = (await dbGet('business_groups')).map((g: any) => ({
-      ...g,
-      member_user_ids: g.member_user_ids_json || [],
+    groupsCache = (await dbGet('BusinessGroups')).map((g: any) => ({
+      id: g.BusinessGroupID ?? g.id,
+      name: g.BusinessGroupName ?? g.name,
+      code: g.BusinessGroupCode ?? g.code,
+      member_user_ids: g.MemberUserIDsJson ?? g.member_user_ids_json ?? [],
     }));
   } catch (e) {
     groupsCache = [];
@@ -51,7 +57,13 @@ async function getGroups(): Promise<any[]> {
 async function getDepartments(): Promise<any[]> {
   if (deptsCache) return deptsCache;
   try {
-    deptsCache = await dbGet('departments');
+    deptsCache = (await dbGet('Departments')).map((d: any) => ({
+      id: d.DepartmentID ?? d.id,
+      name: d.DepartmentName ?? d.name,
+      code: d.DepartmentCode ?? d.code,
+      head_user_id: d.HeadUserID ?? d.head_user_id,
+      manager_id: d.ManagerUserID ?? d.manager_id,
+    }));
   } catch (e) {
     deptsCache = [];
   }
@@ -98,12 +110,15 @@ export async function deptManagerId(deptId: string | undefined): Promise<string 
 export async function resolveTicketAssignees(ticket: any): Promise<string[]> {
   if (!ticket) return [];
   const ids = new Set<string>();
-  for (const a of ticket.current_assignees_json || []) {
+  const assignees = ticket.CurrentAssigneesJson ?? ticket.current_assignees_json ?? [];
+  const assignedUser = ticket.AssignedUser ?? ticket.assigned_user;
+  const assignedGroup = ticket.AssignedGroup ?? ticket.assigned_group;
+  for (const a of assignees) {
     for (const resolved of await expandGroup(a)) ids.add(String(resolved));
   }
-  if (ticket.assigned_user) ids.add(String(ticket.assigned_user));
-  if (ticket.assigned_group) {
-    for (const m of await expandGroup(ticket.assigned_group)) ids.add(String(m));
+  if (assignedUser) ids.add(String(assignedUser));
+  if (assignedGroup) {
+    for (const m of await expandGroup(assignedGroup)) ids.add(String(m));
   }
   return Array.from(ids);
 }
@@ -112,14 +127,16 @@ export async function resolveTicketAssignees(ticket: any): Promise<string[]> {
 export async function resolveTicketObservers(ticket: any): Promise<string[]> {
   if (!ticket) return [];
   const ids = new Set<string>();
+  const ticketId = ticket.TicketID ?? ticket.id;
+  const observerId = ticket.ObserverUserID ?? ticket.observer_id;
   try {
-    const rows = await dbGet('ticket_observers', { ticket_id: { _eq: ticket.id } });
-    for (const r of rows) if (r.user_id) ids.add(String(r.user_id));
+    const rows = await dbGet('TicketObservers', { TicketID: { _eq: ticketId } });
+    for (const r of rows) if (r.UserID) ids.add(String(r.UserID));
   } catch (e) {
     /* non-fatal */
   }
-  if (ticket.observer_id) {
-    for (const o of String(ticket.observer_id).split(',')) if (o) ids.add(o.trim());
+  if (observerId) {
+    for (const o of String(observerId).split(',')) if (o) ids.add(o.trim());
   }
   return Array.from(ids);
 }
@@ -185,9 +202,12 @@ export async function resolveRecipients(ctx: NotificationContext): Promise<strin
     return finalize(ctx.recipients, ctx.actorId, gateAssignee);
   }
   const t = ctx.ticket;
+  const tv = (name: string) => (t ? (t[name] ?? t[{
+    requester_id: 'RequesterUserID', requester_name: 'RequesterName', current_step_order: 'CurrentStepOrder', priority: 'Priority', id: 'TicketID', requester_department_id: 'RequesterDepartmentID', ticket_number: 'TicketNumber',
+  }[name] as any]) : undefined);
+  const requester = tv('requester_id') || tv('requester_name');
   switch (ctx.eventType) {
     case 'request_submitted': {
-      const requester = t?.requester_id || t?.requester_name;
       // Requester gets a confirmation (allowSelf regardless of actor id).
       // The assigned approver is notified separately via `approval_requested`.
       return finalize([requester], ctx.actorId, gateAssignee, true);
@@ -204,38 +224,32 @@ export async function resolveRecipients(ctx: NotificationContext): Promise<strin
     case 'assignment_changed': {
       const prev = ctx.metadata?.previousAssignees as string[] | undefined || [];
       const assignees = await resolveTicketAssignees(t);
-      const requester = t?.requester_id || t?.requester_name;
       return finalize([...prev, requester], ctx.actorId, gateAssignee);
     }
     case 'approved': {
-      const requester = t?.requester_id || t?.requester_name;
       const nextAssignees = (await resolveTicketAssignees(t)).filter((a) => a !== ctx.actorId);
       const observers = await resolveTicketObservers(t);
       return finalize([requester, ...nextAssignees, ...observers], ctx.actorId, gateAssignee);
     }
     case 'rejected':
     case 'returned_for_revision': {
-      const requester = t?.requester_id || t?.requester_name;
       const observers = await resolveTicketObservers(t);
       return finalize([requester, ...observers], ctx.actorId, gateAssignee);
     }
     case 'rfi_sent': {
       // RFI reaches everyone involved in the ticket: requester, tech
       // group/assignee, and CC'd observers.
-      const requester = t?.requester_id || t?.requester_name;
       const assignees = await resolveTicketAssignees(t);
       const observers = await resolveTicketObservers(t);
       return finalize([requester, ...assignees, ...observers], ctx.actorId, gateAssignee);
     }
     case 'rfi_answered': {
       // The RFI reply is announced to everyone on the ticket, not just the staff.
-      const requester = t?.requester_id || t?.requester_name;
       const assignees = await resolveTicketAssignees(t);
       const observers = await resolveTicketObservers(t);
       return finalize([requester, ...assignees, ...observers], ctx.actorId, gateAssignee);
     }
     case 'comment_added': {
-      const requester = t?.requester_id || t?.requester_name;
       const assignees = await resolveTicketAssignees(t);
       const observers = await resolveTicketObservers(t);
       return finalize([requester, ...assignees, ...observers], ctx.actorId, gateAssignee);
@@ -247,12 +261,11 @@ export async function resolveRecipients(ctx: NotificationContext): Promise<strin
       return finalize([...assignees, ...observers], ctx.actorId, gateInternal);
     }
     case 'ticket_closed': {
-      const requester = t?.requester_id || t?.requester_name;
       return finalize([requester], ctx.actorId, gateAssignee);
     }
     case 'sla_breached': {
       const assignees = await resolveTicketAssignees(t);
-      const dept = t?.requester_department_id || (t ? undefined : undefined);
+      const dept = tv('requester_department_id') || undefined;
       const deptAgents = dept ? await usersByRoleInDept(dept, 'agent') : [];
       const manager = dept ? await deptManagerId(dept) : undefined;
       return finalize([...assignees, ...deptAgents, ...(manager ? [manager] : [])], ctx.actorId, gateBreach);
@@ -260,17 +273,16 @@ export async function resolveRecipients(ctx: NotificationContext): Promise<strin
     case 'ola_breached': {
       const assignees = await resolveTicketAssignees(t);
       const escalationTarget: string[] = [];
-      const targetId = t?.ola_escalation_target_id || ctx.metadata?.escalationTargetId;
+      const targetId = (t?.OlaEscalationTargetId ?? t?.ola_escalation_target_id) || ctx.metadata?.escalationTargetId;
       if (targetId) escalationTarget.push(String(targetId));
       return finalize([...assignees, ...escalationTarget], ctx.actorId, gateAssignee);
     }
     case 'ola_escalated': {
-      const targetId = t?.ola_escalation_target_id || ctx.metadata?.escalationTargetId;
+      const targetId = (t?.OlaEscalationTargetId ?? t?.ola_escalation_target_id) || ctx.metadata?.escalationTargetId;
       return finalize([String(targetId)].filter(Boolean), ctx.actorId, gateAssignee);
     }
     case 'delegated': {
       const delegatee = ctx.metadata?.delegateeId as string | undefined;
-      const requester = t?.requester_id || t?.requester_name;
       return finalize([delegatee, requester].filter(Boolean) as string[], ctx.actorId, gateAssignee);
     }
     default:

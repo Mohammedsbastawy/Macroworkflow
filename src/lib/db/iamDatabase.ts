@@ -33,13 +33,13 @@ export async function getDbRoles(): Promise<DbRole[]> {
 export async function getDbUsers(): Promise<DbUser[]> {
   const { dbGet } = await import('./mysqlClient');
   try {
-    const users = await dbGet('system_users', { is_active: 1 });
+    const users = await dbGet('Users', { IsActive: 1 });
     return users.map(u => ({
-      id: u.id,
-      first_name: u.name?.split(' ')[0] || u.name || '',
-      last_name: u.name?.split(' ').slice(1).join(' ') || '',
-      email: u.email || '',
-      role: u.role || 'role-selfservice',
+      id: u.UserID,
+      first_name: u.UserName?.split(' ')[0] || u.UserName || '',
+      last_name: u.UserName?.split(' ').slice(1).join(' ') || '',
+      email: u.UserEmail || '',
+      role: u.Role || 'role-selfservice',
       status: 'active'
     }));
   } catch (e) {

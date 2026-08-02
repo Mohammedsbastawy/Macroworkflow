@@ -348,6 +348,7 @@ function NewRequestInner() {
                         <TransportationRouteControl
                           value={formData[field.key]}
                           onChange={(val) => handleInputChange(field.key, val)}
+                          limits={field.travelLimits}
                         />
                       ) : (
                         <input

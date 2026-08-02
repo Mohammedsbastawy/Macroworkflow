@@ -3,6 +3,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
+export interface TravelLimits {
+  meal?: number;
+  coffee?: number;
+  parking?: number;
+  correspondence?: number;
+  ticketCost?: number;
+}
+
 export interface TravelPackageData {
   mode: "travel_package";
   fromDate: string;
@@ -17,6 +25,8 @@ export interface TravelPackageData {
   ticketFileName?: string;
   calculatedCost: number;
   calculatedMeals: number;
+  mealCost: number;
+  coffeeCost: number;
   correspondenceCost: number;
   parkingCost: number;
   teamMeetingCost: number;
@@ -25,19 +35,23 @@ export interface TravelPackageData {
   additionalNotes?: string;
   additionalAttachmentFileId?: string;
   additionalAttachmentFileName?: string;
+  limitExceededItems?: string[];
 }
 
 interface TransportationRouteControlProps {
   value?: any;
   onChange: (val: any) => void;
   readOnly?: boolean;
+  limits?: TravelLimits;
 }
 
 export function TransportationRouteControl({
   value,
   onChange,
   readOnly = false,
+  limits,
 }: TransportationRouteControlProps) {
+  const lim = limits || {};
   const { lang } = useLanguage();
   // Master Data States
   const [masterZones, setMasterZones] = useState<any[]>([]);
@@ -86,10 +100,12 @@ export function TransportationRouteControl({
       isMeeting: false,
       fromZone: "",
       toZone: "",
-      hasTicket: false,
+hasTicket: false,
       ticketCost: 0,
       calculatedCost: 0,
       calculatedMeals: 0,
+      mealCost: 0,
+      coffeeCost: 0,
       correspondenceCost: 0,
       parkingCost: 0,
       teamMeetingCost: 0,
@@ -114,7 +130,9 @@ export function TransportationRouteControl({
   const [ticketFileName, setTicketFileName] = useState(parsedValue.ticketFileName);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Extra Expenses
+// Extra Expenses
+  const [mealCost, setMealCost] = useState(parsedValue.mealCost || 0);
+  const [coffeeCost, setCoffeeCost] = useState(parsedValue.coffeeCost || 0);
   const [correspondenceCost, setCorrespondenceCost] = useState(parsedValue.correspondenceCost);
   const [parkingCost, setParkingCost] = useState(parsedValue.parkingCost);
   const [teamMeetingCost, setTeamMeetingCost] = useState(parsedValue.teamMeetingCost);
@@ -127,8 +145,6 @@ export function TransportationRouteControl({
 
   // Calculation outputs
   const [policyTransportCost, setPolicyTransportCost] = useState(0);
-  const [policyMealPrice, setPolicyMealPrice] = useState(0);
-  const [policyMealOvernightPrice, setPolicyMealOvernightPrice] = useState(0);
   const [hasMatchingPolicy, setHasMatchingPolicy] = useState(true);
 
   // Validate and adjust toDate when fromDate or isOvernight changes
@@ -155,8 +171,6 @@ export function TransportationRouteControl({
 
     if (!fromZoneId || !toZoneId) {
       setPolicyTransportCost(0);
-      setPolicyMealPrice(0);
-      setPolicyMealOvernightPrice(0);
       setHasMatchingPolicy(false);
       return;
     }
@@ -167,27 +181,28 @@ export function TransportationRouteControl({
 
     if (match) {
       setPolicyTransportCost(Number(match.transport_allowance || 0));
-      setPolicyMealPrice(Number(match.meal_price || 0));
-      setPolicyMealOvernightPrice(Number(match.meal_overnight_price || 0));
       setHasMatchingPolicy(true);
     } else {
       setPolicyTransportCost(0);
-      setPolicyMealPrice(0);
-      setPolicyMealOvernightPrice(0);
       setHasMatchingPolicy(false);
     }
   }, [fromZone, toZone, travelRates, masterZones]);
 
   // Handle HTML5 Constraint Validation
+  const routeIncomplete = (!!fromZone && !toZone) || (!fromZone && !!toZone);
   useEffect(() => {
     if (!hiddenInputRef.current) return;
-    const isInvalid = fromZone && toZone && !hasMatchingPolicy && !hasTicket;
+    const isInvalid = (fromZone && toZone && !hasMatchingPolicy && !hasTicket) || routeIncomplete;
     if (isInvalid) {
-      hiddenInputRef.current.setCustomValidity("خطأ: خط السير المحدد غير مدرج في السياسات المعتمدة للشركة.");
+      hiddenInputRef.current.setCustomValidity(
+        routeIncomplete
+          ? "خطأ: يجب تحديد كل من منطقة الذهاب ومنطقة الوصول معًا إذا اخترت إحداهما."
+          : "خطأ: خط السير المحدد غير مدرج في السياسات المعتمدة للشركة."
+      );
     } else {
       hiddenInputRef.current.setCustomValidity("");
     }
-  }, [fromZone, toZone, hasMatchingPolicy, hasTicket]);
+  }, [fromZone, toZone, hasMatchingPolicy, hasTicket, routeIncomplete]);
 
   // Perform overall calculations
   const calculateDays = () => {
@@ -204,26 +219,31 @@ export function TransportationRouteControl({
   // Calculated Transportation Cost
   const calculatedTransportCost = hasTicket ? Number(ticketCost) : policyTransportCost;
 
-  // Calculated Meals Cost
-  const calculatedMealsCost = (() => {
-    if (!isOvernight) {
-      // 1-Day Trip
-      if (isMeeting) return 0; // cancelled due to meeting
-      return policyMealPrice; // 1 normal meal price
-    } else {
-      // Overnight stay
-      // Day 1: Overnight meal price, Day 2+: normal meal price
-      if (daysCount <= 1) return policyMealPrice;
-      return policyMealOvernightPrice + (policyMealPrice * (daysCount - 1));
-    }
-  })();
-
   const grandTotalCost =
     calculatedTransportCost +
-    calculatedMealsCost +
+    Number(mealCost || 0) +
+    Number(coffeeCost || 0) +
     Number(correspondenceCost) +
     Number(parkingCost) +
     Number(teamMeetingCost);
+
+  // Per-item expense limit validation (limits defined by the form builder admin).
+  // We only tell the user that a limit was exceeded — never the actual limit value.
+  const exceededItems: { key: string; label: string }[] = [];
+  const checkExceeded = (key: keyof TravelLimits, label: string, val: number) => {
+    const l = lim[key];
+    if (typeof l === "number" && l > 0 && val > l) exceededItems.push({ key, label });
+  };
+  checkExceeded("meal", "🍔 الوجبات", Number(mealCost || 0));
+  checkExceeded("coffee", "☕ القهوة", Number(coffeeCost || 0));
+  checkExceeded("parking", "🅿️ الباركينج", Number(parkingCost || 0));
+  checkExceeded("correspondence", "✉️ المراسلات", Number(correspondenceCost || 0));
+  if (hasTicket) checkExceeded("ticketCost", "🎟️ تذكرة السفر", Number(ticketCost || 0));
+  const hasLimitExceeded = exceededItems.length > 0;
+  const isOverLimit = (key: keyof TravelLimits, val: number) => {
+    const l = lim[key];
+    return typeof l === "number" && l > 0 && val > l;
+  };
 
   // File Upload helper
   const uploadTodatabase = async (file: File): Promise<{ id: string; filename: string }> => {
@@ -296,7 +316,9 @@ export function TransportationRouteControl({
       ticketFileId,
       ticketFileName,
       calculatedCost: calculatedTransportCost,
-      calculatedMeals: calculatedMealsCost,
+      calculatedMeals: Number(mealCost || 0),
+      mealCost: Number(mealCost || 0),
+      coffeeCost: Number(coffeeCost || 0),
       correspondenceCost: Number(correspondenceCost),
       parkingCost: Number(parkingCost),
       teamMeetingCost: Number(teamMeetingCost),
@@ -305,6 +327,7 @@ export function TransportationRouteControl({
       additionalNotes,
       additionalAttachmentFileId,
       additionalAttachmentFileName,
+      limitExceededItems: exceededItems.map(e => e.key),
     };
 
     onChange(JSON.stringify(payload));
@@ -319,10 +342,13 @@ export function TransportationRouteControl({
     ticketCost,
     ticketFileId,
     ticketFileName,
+    mealCost,
+    coffeeCost,
     correspondenceCost,
     parkingCost,
     teamMeetingCost,
     grandTotalCost,
+    hasLimitExceeded,
     additionalNotes,
     additionalAttachmentFileId,
     additionalAttachmentFileName,
@@ -364,7 +390,7 @@ export function TransportationRouteControl({
 
       {/* Title Header */}
       <div style={{ fontSize: 14, fontWeight: 800, color: "var(--color-primary)", display: "flex", alignItems: "center", gap: 6 }}>
-        <span>🚗</span> {lang === "ar" ? "تفاصيل طلب الانتقال وبدل السفر المجمع" : "Travel & Transportation Package Details"}
+        <span>💳</span> {lang === "ar" ? "المصاريف" : "Expenses"}
       </div>
 
       {/* Row 1: Dates & Overnight Toggle */}
@@ -423,15 +449,14 @@ export function TransportationRouteControl({
       {/* Row 2: Origin & Destination Selector Dropdowns */}
       <div className="form-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <div className="form-group" style={{ marginBottom: 0 }}>
-          <label className="form-label" style={{ fontWeight: 700 }}>
-            {lang === "ar" ? "📍 من منطقة *" : "📍 Origin Zone *"}
+<label className="form-label" style={{ fontWeight: 700 }}>
+            {lang === "ar" ? "📍 من منطقة (اختياري)" : "📍 Origin Zone (optional)"}
           </label>
           <select
             className="form-control"
             value={fromZone}
             onChange={(e) => setFromZone(e.target.value)}
             disabled={readOnly}
-            required
           >
             <option value="">{lang === "ar" ? "-- اختر منطقة الذهاب --" : "-- Select Origin Zone --"}</option>
             {masterZones.map((z) => (
@@ -443,15 +468,14 @@ export function TransportationRouteControl({
         </div>
 
         <div className="form-group" style={{ marginBottom: 0 }}>
-          <label className="form-label" style={{ fontWeight: 700 }}>
-            {lang === "ar" ? "🏢 إلى منطقة *" : "🏢 Destination Zone *"}
+<label className="form-label" style={{ fontWeight: 700 }}>
+            {lang === "ar" ? "🏢 إلى منطقة (اختياري)" : "🏢 Destination Zone (optional)"}
           </label>
           <select
             className="form-control"
             value={toZone}
             onChange={(e) => setToZone(e.target.value)}
             disabled={readOnly}
-            required
           >
             <option value="">{lang === "ar" ? "-- اختر منطقة العودة --" : "-- Select Destination Zone --"}</option>
             {masterZones.map((z) => (
@@ -462,6 +486,29 @@ export function TransportationRouteControl({
           </select>
         </div>
       </div>
+
+      {/* Route pairing warning: Origin & Destination must be chosen together */}
+      {routeIncomplete && (
+        <div
+          style={{
+            padding: "10px 14px",
+            background: "#FEF3C7",
+            border: "2px solid #F59E0B",
+            borderRadius: 8,
+            color: "#92400E",
+            fontSize: 12,
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <span style={{ fontSize: 18 }}>⚠️</span>
+          {lang === "ar"
+            ? "يجب تحديد كل من منطقة الذهاب ومنطقة الوصول معًا — لا يمكن اختيار واحدة فقط."
+            : "Origin and Destination zones must be selected together — you cannot choose only one."}
+        </div>
+      )}
 
       {/* Critical Policy Error Box if not matched and no ticket is present */}
       {fromZone && toZone && !hasMatchingPolicy && !hasTicket && (
@@ -558,7 +605,11 @@ export function TransportationRouteControl({
             <input
               type="number"
               className="form-control"
-              style={{ fontWeight: 800, color: "var(--color-primary)" }}
+              style={
+                isOverLimit("ticketCost", Number(ticketCost || 0))
+                  ? { fontWeight: 800, color: "var(--color-primary)", borderColor: "#EF4444", borderWidth: 2 }
+                  : { fontWeight: 800, color: "var(--color-primary)" }
+              }
               placeholder="0.00"
               value={ticketCost || ""}
               onChange={(e) => setTicketCost(Number(e.target.value))}
@@ -616,16 +667,17 @@ export function TransportationRouteControl({
         }}
       >
         <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 12, color: "var(--color-primary)" }}>
-          💵 {lang === "ar" ? "مصاريف إضافية أخرى" : "Extra Expenses"}
+          💵 {lang === "ar" ? "مصاريف إضافية أخرى (بالجنية المصري)" : "Extra Expenses (EGP)"}
         </div>
-        <div className="form-grid-3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+        <div className="form-grid-3" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label" style={{ fontSize: 12, fontWeight: 700 }}>
-              ✉️ {lang === "ar" ? "مراسلات" : "Correspondence"}
+              ✉️ {lang === "ar" ? "مراسلات (ج.م)" : "Correspondence (EGP)"}
             </label>
             <input
               type="number"
               className="form-control"
+              style={isOverLimit("correspondence", Number(correspondenceCost || 0)) ? { borderColor: "#EF4444", borderWidth: 2, fontWeight: 800 } : undefined}
               placeholder="0.00"
               value={correspondenceCost || ""}
               onChange={(e) => setCorrespondenceCost(Number(e.target.value))}
@@ -635,11 +687,12 @@ export function TransportationRouteControl({
 
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label" style={{ fontSize: 12, fontWeight: 700 }}>
-              🅿️ {lang === "ar" ? "باركينج" : "Parking"}
+              🅿️ {lang === "ar" ? "باركينج (ج.م)" : "Parking (EGP)"}
             </label>
             <input
               type="number"
               className="form-control"
+              style={isOverLimit("parking", Number(parkingCost || 0)) ? { borderColor: "#EF4444", borderWidth: 2, fontWeight: 800 } : undefined}
               placeholder="0.00"
               value={parkingCost || ""}
               onChange={(e) => setParkingCost(Number(e.target.value))}
@@ -649,7 +702,37 @@ export function TransportationRouteControl({
 
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label" style={{ fontSize: 12, fontWeight: 700 }}>
-              👥 {lang === "ar" ? "اجتماع فريق" : "Team Meeting"}
+              🍔 {lang === "ar" ? "وجبات (ج.م)" : "Meals (EGP)"}
+            </label>
+            <input
+              type="number"
+              className="form-control"
+              style={isOverLimit("meal", Number(mealCost || 0)) ? { borderColor: "#EF4444", borderWidth: 2, fontWeight: 800 } : undefined}
+              placeholder="0.00"
+              value={mealCost || ""}
+              onChange={(e) => setMealCost(Number(e.target.value))}
+              disabled={readOnly}
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label" style={{ fontSize: 12, fontWeight: 700 }}>
+              ☕ {lang === "ar" ? "قهوة (ج.م)" : "Coffee (EGP)"}
+            </label>
+            <input
+              type="number"
+              className="form-control"
+              style={isOverLimit("coffee", Number(coffeeCost || 0)) ? { borderColor: "#EF4444", borderWidth: 2, fontWeight: 800 } : undefined}
+              placeholder="0.00"
+              value={coffeeCost || ""}
+              onChange={(e) => setCoffeeCost(Number(e.target.value))}
+              disabled={readOnly}
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label" style={{ fontSize: 12, fontWeight: 700 }}>
+              👥 {lang === "ar" ? "اجتماع فريق (ج.م)" : "Team Meeting (EGP)"}
             </label>
             <input
               type="number"
@@ -662,6 +745,34 @@ export function TransportationRouteControl({
           </div>
         </div>
       </div>
+
+      {/* Limit exceeded alert (value of the limit is intentionally hidden) */}
+      {hasLimitExceeded && (
+        <div
+          style={{
+            padding: "12px 14px",
+            background: "#FEF2F2",
+            border: "2px solid #EF4444",
+            borderRadius: 8,
+            color: "#991B1B",
+            fontSize: 13,
+            fontWeight: 800,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <span style={{ fontSize: 20 }}>⚠️</span>
+          <div>
+            {lang === "ar"
+              ? "تم تجاوز الحد المسموح لأحد البنود المالية التالية — يرجى مراجعة القيمة المدخلة: "
+              : "Expense limit exceeded for one or more items — please review the entered amounts: "}
+            <span style={{ fontWeight: 600 }}>
+              {exceededItems.map(e => e.label).join(lang === "ar" ? "، " : ", ")}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Row 6: Additional Notes & Attachment */}
       <div
@@ -752,14 +863,10 @@ export function TransportationRouteControl({
                 : (lang === "ar" ? ` (تلقائي للائحة: ${policyTransportCost})` : ` (Policy Rate: ${policyTransportCost})`)}
             </div>
             <div>
-              • 🍔 <strong>{lang === "ar" ? "بدل الوجبات:" : "Meals Allowance:"}</strong> {calculatedMealsCost.toLocaleString()} {lang === "ar" ? "ج.م" : "EGP"}
-              {isOvernight
-                ? (lang === "ar"
-                  ? ` (مبيت ${daysCount} أيام: أول يوم ${policyMealOvernightPrice} + ${daysCount - 1} أيام × ${policyMealPrice})`
-                  : ` (Overnight ${daysCount} days: 1st day ${policyMealOvernightPrice} + ${daysCount - 1} days × ${policyMealPrice})`)
-                : isMeeting
-                ? (lang === "ar" ? " (ملغاة لوجود اجتماع)" : " (Waived due to meeting)")
-                : (lang === "ar" ? ` (يوم عادي: ${policyMealPrice})` : ` (Standard day: ${policyMealPrice})`)}
+              • 🍔 <strong>{lang === "ar" ? "الوجبات:" : "Meals:"}</strong> {Number(mealCost || 0).toLocaleString()} {lang === "ar" ? "ج.م" : "EGP"}
+            </div>
+            <div>
+              • ☕ <strong>{lang === "ar" ? "القهوة:" : "Coffee:"}</strong> {Number(coffeeCost || 0).toLocaleString()} {lang === "ar" ? "ج.م" : "EGP"}
             </div>
             <div>
               • ✉️ <strong>{lang === "ar" ? "المراسلات:" : "Correspondence:"}</strong> {Number(correspondenceCost).toLocaleString()} {lang === "ar" ? "ج.م" : "EGP"}

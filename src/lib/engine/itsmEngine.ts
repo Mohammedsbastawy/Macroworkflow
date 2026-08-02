@@ -55,37 +55,37 @@ export async function pauseTicketOlaClockForRfi(ticketId: string, actorName: str
 
   const now = new Date().toISOString();
 
-  // Update ticket status in database
-  const updatedTicket = await dbUpdate('tickets', ticket.id, {
-    status: 'pending_info',
-    ola_clock_paused_at: now,
-    date_updated: now,
+// Update ticket status in database
+  const updatedTicket = await dbUpdate('Tickets', ticket.TicketID ?? ticket.id, {
+    Status: 'pending_info',
+    OlaClockPausedAt: now,
+    DateUpdated: now,
   });
 
-  const auditHash = generateAuditHash(ticket.id, actorName, 'rfi_sent', now);
+  const auditHash = generateAuditHash(ticket.TicketID ?? ticket.id, actorName, 'rfi_sent', now);
 
   // Create approval log in database
   const logPayload = {
-    ticket_id: ticket.id,
-    actor_id: actorName,
-    actor_name: actorName,
-    action: 'rfi_sent',
-    comments: `RFI Question: ${rfiQuestion}`,
-    decision_at: now,
-    hash_sha256: auditHash,
+    TicketID: ticket.TicketID ?? ticket.id,
+    ActorUserID: actorName,
+    ActorUserName: actorName,
+    Action: 'rfi_sent',
+    Comments: `RFI Question: ${rfiQuestion}`,
+    DecisionAt: now,
+    HashSha256: auditHash,
   };
 
-  const log = await dbCreate('approval_log', logPayload);
+  const log = await dbCreate('ApprovalLog', logPayload);
 
   // Log OLA clock paused separately for Activity Timeline
-  await dbCreate('approval_log', {
-    id: `log_ola_pause_${Date.now()}`,
-    ticket_id: ticket.id,
-    actor_id: 'System',
-    actor_name: 'OLA Tracker',
-    action: 'ola_paused',
-    comments: `[OLA Tracker]: OLA clock paused due to RFI (Request For Information).`,
-    decision_at: now,
+  await dbCreate('ApprovalLog', {
+    ApprovalLogID: `log_ola_pause_${Date.now()}`,
+    TicketID: ticket.TicketID ?? ticket.id,
+    ActorUserID: 'System',
+    ActorUserName: 'OLA Tracker',
+    Action: 'ola_paused',
+    Comments: `[OLA Tracker]: OLA clock paused due to RFI (Request For Information).`,
+    DecisionAt: now,
   });
 
   // ── Notification: RFI sent → announce to everyone on the ticket
@@ -93,8 +93,8 @@ export async function pauseTicketOlaClockForRfi(ticketId: string, actorName: str
   void notify({
     eventType: 'rfi_sent',
     ticket: updatedTicket || ticket,
-    ticketId: ticket.id,
-    ticketNumber: ticket.ticket_number,
+    ticketId: ticket.TicketID ?? ticket.id,
+    ticketNumber: ticket.TicketNumber ?? ticket.ticket_number,
     actorId: actorName,
     actorName,
     metadata: { rfiQuestion },
@@ -113,55 +113,55 @@ export async function resumeTicketOlaClockAfterRfi(ticketId: string, requesterNa
 
   const now = new Date().toISOString();
   const updatePayload: Record<string, any> = {
-    status: 'pending',
-    date_updated: now,
+    Status: 'pending',
+    DateUpdated: now,
   };
 
-  if (ticket.ola_clock_paused_at) {
-    const pausedMs = Date.now() - new Date(ticket.ola_clock_paused_at).getTime();
-    updatePayload.ola_accumulated_pause_ms = (ticket.ola_accumulated_pause_ms || 0) + pausedMs;
-    updatePayload.ola_clock_paused_at = null;
+  if (ticket.OlaClockPausedAt ?? ticket.ola_clock_paused_at) {
+    const pausedMs = Date.now() - new Date(ticket.OlaClockPausedAt ?? ticket.ola_clock_paused_at).getTime();
+    updatePayload.OlaAccumulatedPauseMs = ((ticket.OlaAccumulatedPauseMs ?? ticket.ola_accumulated_pause_ms) || 0) + pausedMs;
+    updatePayload.OlaClockPausedAt = null;
 
     // Extend OLA deadline by paused duration
-    if (ticket.ola_deadline) {
-      const oldDeadline = new Date(ticket.ola_deadline).getTime();
-      updatePayload.ola_deadline = new Date(oldDeadline + pausedMs).toISOString();
+    if (ticket.OlaDeadline ?? ticket.ola_deadline) {
+      const oldDeadline = new Date(ticket.OlaDeadline ?? ticket.ola_deadline).getTime();
+      updatePayload.OlaDeadline = new Date(oldDeadline + pausedMs).toISOString();
     }
   }
 
-  const updatedTicket = await dbUpdate('tickets', ticket.id, updatePayload);
+  const updatedTicket = await dbUpdate('Tickets', ticket.TicketID ?? ticket.id, updatePayload);
 
-  const auditHash = generateAuditHash(ticket.id, requesterName, 'rfi_answered', now);
+  const auditHash = generateAuditHash(ticket.TicketID ?? ticket.id, requesterName, 'rfi_answered', now);
 
   const logPayload = {
-    ticket_id: ticket.id,
-    actor_id: requesterName,
-    actor_name: requesterName,
-    action: 'rfi_answered',
-    comments: `RFI Answer: ${answerText}`,
-    decision_at: now,
-    hash_sha256: auditHash,
+    TicketID: ticket.TicketID ?? ticket.id,
+    ActorUserID: requesterName,
+    ActorUserName: requesterName,
+    Action: 'rfi_answered',
+    Comments: `RFI Answer: ${answerText}`,
+    DecisionAt: now,
+    HashSha256: auditHash,
   };
 
-  const log = await dbCreate('approval_log', logPayload);
+  const log = await dbCreate('ApprovalLog', logPayload);
 
   // Log OLA clock resumed separately for Activity Timeline
-  await dbCreate('approval_log', {
-    id: `log_ola_resume_${Date.now()}`,
-    ticket_id: ticket.id,
-    actor_id: 'System',
-    actor_name: 'OLA Tracker',
-    action: 'ola_resumed',
-    comments: `[OLA Tracker]: OLA clock resumed.`,
-    decision_at: now,
+  await dbCreate('ApprovalLog', {
+    ApprovalLogID: `log_ola_resume_${Date.now()}`,
+    TicketID: ticket.TicketID ?? ticket.id,
+    ActorUserID: 'System',
+    ActorUserName: 'OLA Tracker',
+    Action: 'ola_resumed',
+    Comments: `[OLA Tracker]: OLA clock resumed.`,
+    DecisionAt: now,
   });
 
   // ── Notification: RFI answered → announce to everyone on the ticket.
   void notify({
     eventType: 'rfi_answered',
     ticket: updatedTicket || ticket,
-    ticketId: ticket.id,
-    ticketNumber: ticket.ticket_number,
+    ticketId: ticket.TicketID ?? ticket.id,
+    ticketNumber: ticket.TicketNumber ?? ticket.ticket_number,
     actorId: requesterName,
     actorName: requesterName,
     metadata: { answerText },
@@ -176,12 +176,12 @@ export async function resumeTicketOlaClockAfterRfi(ticketId: string, requesterNa
 async function findTicket(ticketId: string): Promise<any | null> {
   // Try by direct ID first
   try {
-    const rows = await dbGet('tickets', { id: { _eq: ticketId } }, undefined, 1);
+    const rows = await dbGet('Tickets', { TicketID: { _eq: ticketId } }, undefined, 1);
     if (rows.length > 0) return rows[0];
   } catch {}
 
   // Try by ticket_number
-  const byNumber = await dbGet('tickets', { ticket_number: { _eq: ticketId } }, undefined, 1);
+  const byNumber = await dbGet('Tickets', { TicketNumber: { _eq: ticketId } }, undefined, 1);
   if (byNumber.length > 0) return byNumber[0];
 
   return null;

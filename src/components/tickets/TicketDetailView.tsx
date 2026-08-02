@@ -585,8 +585,12 @@ export function TicketDetailView({
                                       <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.calculatedCost || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
                                     </tr>
                                     <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>🍔 {isAr ? "بدل الوجبات" : "Meals & Overnight Allowance"} {parsedJson.isMeeting && !parsedJson.isOvernight ? (isAr ? " (ملغى لوجود اجتماع)" : " (Cancelled for meeting)") : ""}</td>
-                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.calculatedMeals || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
+                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>🍔 {isAr ? "الوجبات" : "Meals Allowance"}</td>
+                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.calculatedMeals ?? parsedJson.mealCost ?? 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
+                                    </tr>
+                                    <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>☕ {isAr ? "القهوة" : "Coffee"}</td>
+                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.coffeeCost || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
                                     </tr>
                                     <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
                                       <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>✉️ {isAr ? "المراسلات" : "Correspondence Cost"}</td>

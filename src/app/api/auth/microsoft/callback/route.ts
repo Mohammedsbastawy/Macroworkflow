@@ -69,18 +69,18 @@ export async function GET(req: Request) {
   const { dbGet, dbUpdate } = await import("@/lib/db/mysqlClient");
   let user: any = null;
   try {
-    const rows = await dbGet("system_users", { email });
+    const rows = await dbGet("Users", { UserEmail: email });
     user = rows[0];
   } catch (e) {
     console.error("m365 user lookup error:", e);
     return NextResponse.redirect(`${base}/login?error=internal`);
   }
 
-  if (!user || user.is_active !== 1) {
+  if (!user || user.IsActive !== 1) {
     // No public registration: the email must already be provisioned by an admin.
     return NextResponse.redirect(`${base}/login?error=not_provisioned`);
   }
-  if ((user.auth_type || "password").toLowerCase() === "password") {
+  if ((user.AuthType || "password").toLowerCase() === "password") {
     return NextResponse.redirect(`${base}/login?error=password_only`);
   }
 
@@ -93,10 +93,10 @@ export async function GET(req: Request) {
     scopes: tokens.scope || settings.scopes || "",
   };
   try {
-    await dbUpdate("system_users", user.id, {
-      azure_ad_id: profile.id || user.azure_ad_id,
-      m365_token_json: tokenRecord,
-      m365_mail_enabled: 1,
+    await dbUpdate("Users", user.UserID, {
+      AzureAdId: profile.id || user.AzureAdId,
+      M365TokenJson: tokenRecord,
+      M365MailEnabled: 1,
     });
   } catch (e) {
     console.error("m365 token persist error:", e);

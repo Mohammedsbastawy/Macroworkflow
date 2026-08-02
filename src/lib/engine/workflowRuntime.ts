@@ -9,13 +9,13 @@ export function resolveAssignee(expression: string, ticket: any): string {
   const lower = cleanExpr.toLowerCase();
   
   if (cleanExpr === '{{requester.manager}}' || lower === 'requester.manager' || lower === 'manager' || lower === 'direct manager' || lower === 'requester manager') {
-    const reqUser = SYSTEM_USERS.find(u => u.id === ticket.requester_id || u.name === ticket.requester_name || u.email === ticket.requester_id);
+    const reqUser = SYSTEM_USERS.find(u => u.id === ticket.RequesterUserID || u.id === ticket.requester_id || u.name === ticket.RequesterName || u.name === ticket.requester_name || u.email === ticket.RequesterUserID || u.email === ticket.requester_id);
     const managerId = reqUser?.direct_manager_id;
     const managerUser = SYSTEM_USERS.find(u => u.id === managerId);
     return managerUser ? `${managerUser.name} (${managerUser.job_title || 'Manager'})` : (managerId || 'Department Manager');
   }
   if (cleanExpr === '{{requester.department_head}}' || lower === 'requester.department_head' || lower === 'department_head' || lower === 'dept_head' || lower === 'dept head' || lower === 'department head') {
-    const reqUser = SYSTEM_USERS.find(u => u.id === ticket.requester_id || u.name === ticket.requester_name || u.email === ticket.requester_id);
+    const reqUser = SYSTEM_USERS.find(u => u.id === ticket.RequesterUserID || u.id === ticket.requester_id || u.name === ticket.RequesterName || u.name === ticket.requester_name || u.email === ticket.RequesterUserID || u.email === ticket.requester_id);
     const deptId = reqUser?.department_id;
     const dept = DEPARTMENTS.find(d => d.id === deptId);
     const headUserId = dept?.head_user_id;
@@ -83,28 +83,28 @@ function matches(actual: any, operator: string | undefined, expected: any) {
 }
 
 async function valuesFor(ticketId: string) {
-  const rows = await dbGet<any>('ticket_values', { ticket_id: { _eq: ticketId } });
+  const rows = await dbGet<any>('TicketValues', { TicketID: { _eq: ticketId } });
   return Object.fromEntries(rows.map((row) => {
-    const raw = row.value_text ?? row.field_value ?? row.value_number;
-    try { return [row.field_key, typeof raw === 'string' ? JSON.parse(raw) : raw]; } catch { return [row.field_key, raw]; }
+    const raw = row.ValueText ?? row.value_text ?? row.FieldValue ?? row.field_value ?? row.ValueNumber ?? row.value_number;
+    try { return [row.FieldKey ?? row.field_key, typeof raw === 'string' ? JSON.parse(raw) : raw]; } catch { return [row.FieldKey ?? row.field_key, raw]; }
   }));
 }
 
 async function audit(ticketId: string, node: Node, message: string) {
-  await dbCreate('approval_log', {
-    id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    ticket_id: ticketId, step_node_id: node.id, action: 'workflow_action', actor_id: 'workflow-engine', actor_name: 'Workflow Engine', comments: message, decision_at: new Date().toISOString(),
+  await dbCreate('ApprovalLog', {
+    ApprovalLogID: `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    TicketID: ticketId, StepNodeID: node.id, Action: 'workflow_action', ActorUserID: 'workflow-engine', ActorUserName: 'Workflow Engine', Comments: message, DecisionAt: new Date().toISOString(),
   });
 }
 
 async function executeAction(ticket: any, node: Node) {
   const data = node.data || {};
-  const updates: Record<string, any> = { date_updated: new Date().toISOString() };
+  const updates: Record<string, any> = { DateUpdated: new Date().toISOString() };
   switch (node.type) {
-    case 'assign_group_node': updates.assigned_group = data.group_name || data.group_id || ''; if (updates.assigned_group) updates.current_assignees_json = [updates.assigned_group]; break;
-    case 'assign_user_node': updates.assigned_user = data.user_name || data.user_id || ''; if (updates.assigned_user) updates.current_assignees_json = [updates.assigned_user]; break;
-    case 'set_priority_node': updates.priority = data.priority || 'high'; break;
-    case 'set_status_node': updates.status = data.status || 'assigned'; if (data.pending_reason) updates.pending_reason = data.pending_reason; break;
+    case 'assign_group_node': updates.AssignedGroup = data.group_name || data.group_id || ''; if (updates.AssignedGroup) updates.CurrentAssigneesJson = [updates.AssignedGroup]; break;
+    case 'assign_user_node': updates.AssignedUser = data.user_name || data.user_id || ''; if (updates.AssignedUser) updates.CurrentAssigneesJson = [updates.AssignedUser]; break;
+    case 'set_priority_node': updates.Priority = data.priority || 'high'; break;
+    case 'set_status_node': updates.Status = data.status || 'assigned'; if (data.pending_reason) updates.PendingReason = data.pending_reason; break;
     case 'attach_sla_node': {
       const policyName = data.sla_policy_name || 'Standard SLA (48h)';
       let durationMs = 48 * 60 * 60 * 1000;
@@ -119,8 +119,8 @@ async function executeAction(ticket: any, node: Node) {
         if (hours > 0) durationMs = hours * 3600000;
       }
       const deadline = new Date(Date.now() + durationMs).toISOString();
-      updates.sla_deadline = deadline;
-      updates.sla_ttr_deadline = deadline;
+      updates.SlaDeadline = deadline;
+      updates.SlaTtrDeadline = deadline;
       break;
     }
     case 'attach_ola_node': {
@@ -136,21 +136,22 @@ async function executeAction(ticket: any, node: Node) {
         const hours = Number(data.ola_target_hours ?? 4);
         if (hours > 0) durationMs = hours * 3600000;
       }
-      updates.ola_deadline = new Date(Date.now() + durationMs).toISOString();
+      updates.OlaDeadline = new Date(Date.now() + durationMs).toISOString();
       break;
     }
-    case 'set_watcher_node': { const watcher = data.watcher_name || data.watcher_id || ''; if (watcher) updates.observer_id = Array.from(new Set([...String(ticket.observer_id || '').split(',').map((v) => v.trim()).filter(Boolean), watcher])).join(', '); break; }
-    case 'set_solution_node': updates.solution_type = data.solution_type || 'resolved'; updates.solution_description = data.solution_description || data.label || ''; break;
+    case 'set_watcher_node': { const watcher = data.watcher_name || data.watcher_id || ''; if (watcher) updates.ObserverUserID = Array.from(new Set([...String((ticket.ObserverUserID ?? ticket.observer_id) || '').split(',').map((v) => v.trim()).filter(Boolean), watcher])).join(', '); break; }
+    case 'set_solution_node': updates.SolutionType = data.solution_type || 'resolved'; updates.SolutionDescription = data.solution_description || data.label || ''; break;
     case 'update_record': Object.assign(updates, data.ticket_updates || {}); break;
   }
-  const updated = await dbUpdate<any>('tickets', ticket.id, updates);
-  await audit(ticket.id, node, `Workflow action executed: ${data.label || node.type || 'action'}`);
+  const updated = await dbUpdate<any>('Tickets', ticket.TicketID ?? ticket.id, updates);
+  await audit(ticket.TicketID ?? ticket.id, node, `Workflow action executed: ${data.label || node.type || 'action'}`);
   return updated;
 }
 
 async function run(ticket: any, workflow: any, startNodeId: string, suppliedValues?: Record<string, any>) {
   const { nodes, edges } = graphOf(workflow);
-  const values = suppliedValues || await valuesFor(ticket.id);
+  const tid = (inputTicket: any) => inputTicket.TicketID ?? inputTicket.id;
+  const values = suppliedValues || await valuesFor(tid(ticket));
   let current = ticket;
   let nodeId = startNodeId;
   for (let index = 0; index < 50; index += 1) {
@@ -160,7 +161,7 @@ async function run(ticket: any, workflow: any, startNodeId: string, suppliedValu
       const rawAssignee = node.data?.assignee_value || node.data?.assignee_id || '{{requester.manager}}';
       const resolved = resolveAssignee(rawAssignee, current);
 
-      const currentObservers = String(current.observer_id || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+      const currentObservers = String((current.ObserverUserID ?? current.observer_id) || '').split(',').map((s: string) => s.trim()).filter(Boolean);
       if (resolved && !currentObservers.includes(resolved) && !resolved.toLowerCase().includes("unassigned")) {
         currentObservers.push(resolved);
       }
@@ -176,44 +177,44 @@ async function run(ticket: any, workflow: any, startNodeId: string, suppliedValu
       const stepOlaDeadline = new Date(Date.now() + olaMs).toISOString();
 
       const stepOlaStr = hours > 0 ? `${Math.round(hours)}h ${minutes > 0 ? `${minutes}m` : ''}` : `${minutes}m`;
-      await dbCreate('approval_log', {
-        id: `log_ola_graph_start_${Date.now()}`,
-        ticket_id: current.id,
-        actor_id: 'System',
-        actor_name: 'OLA Tracker',
-        action: 'ola_started',
-        comments: `[OLA Tracker]: Active Step OLA for "${node.data?.label || (node as any).name || 'Approval Step'}" started. Target: ${stepOlaStr}. Deadline is ${new Date(stepOlaDeadline).toLocaleString()}.`,
-        decision_at: new Date().toISOString(),
+      await dbCreate('ApprovalLog', {
+        ApprovalLogID: `log_ola_graph_start_${Date.now()}`,
+        TicketID: tid(current),
+        ActorUserID: 'System',
+        ActorUserName: 'OLA Tracker',
+        Action: 'ola_started',
+        Comments: `[OLA Tracker]: Active Step OLA for "${node.data?.label || (node as any).name || 'Approval Step'}" started. Target: ${stepOlaStr}. Deadline is ${new Date(stepOlaDeadline).toLocaleString()}.`,
+        DecisionAt: new Date().toISOString(),
       });
 
-      return dbUpdate('tickets', current.id, {
-        status: 'pending',
-        current_step_node_id: node.id,
-        current_step_order: index + 1,
-        current_assignees_json: [resolved],
-        observer_id: updatedObserverId,
-        ola_deadline: stepOlaDeadline,
-        date_updated: new Date().toISOString()
+      return dbUpdate('Tickets', tid(current), {
+        Status: 'pending',
+        CurrentStepNodeID: node.id,
+        CurrentStepOrder: index + 1,
+        CurrentAssigneesJson: [resolved],
+        ObserverUserID: updatedObserverId,
+        OlaDeadline: stepOlaDeadline,
+        DateUpdated: new Date().toISOString()
       });
     }
-    if (node.type === 'end') return dbUpdate('tickets', current.id, { status: 'approved', current_step_node_id: node.id, current_step_order: index + 1, current_assignees_json: [], solved_at: new Date().toISOString(), date_updated: new Date().toISOString() });
+    if (node.type === 'end') return dbUpdate('Tickets', tid(current), { Status: 'approved', CurrentStepNodeID: node.id, CurrentStepOrder: index + 1, CurrentAssigneesJson: [], SolvedAt: new Date().toISOString(), DateUpdated: new Date().toISOString() });
     let edge: Edge | undefined;
     if (node.type === 'conditional' || node.type === 'rule_criterion') {
       const field = node.data?.condition_field || node.data?.field;
       const passed = matches(valueFor(field, current, values), node.data?.condition_operator || node.data?.operator, node.data?.condition_value ?? node.data?.value);
-      await audit(current.id, node, `Condition evaluated ${passed ? 'true' : 'false'}: ${field || 'field'}`);
+      await audit(tid(current), node, `Condition evaluated ${passed ? 'true' : 'false'}: ${field || 'field'}`);
       edge = nextEdge(edges, node.id, passed ? ['true', 'approve'] : ['false', 'reject']);
     } else {
       if (node.type !== 'trigger') current = await executeAction(current, node);
       edge = nextEdge(edges, node.id);
     }
     if (!edge) {
-      const finalStatus = current.status === 'pending' ? 'approved' : current.status;
-      return dbUpdate('tickets', current.id, { 
-        status: finalStatus, 
-        current_assignees_json: [], 
-        solved_at: ['solved', 'approved'].includes(finalStatus) ? new Date().toISOString() : undefined,
-        date_updated: new Date().toISOString() 
+      const finalStatus = (current.Status ?? current.status) === 'pending' ? 'approved' : (current.Status ?? current.status);
+      return dbUpdate('Tickets', tid(current), { 
+        Status: finalStatus, 
+        CurrentAssigneesJson: [], 
+        SolvedAt: ['solved', 'approved'].includes(finalStatus) ? new Date().toISOString() : undefined,
+        DateUpdated: new Date().toISOString() 
       });
     }
     nodeId = edge.target;
@@ -233,11 +234,12 @@ export async function startGraphWorkflow(ticket: any, workflow: any, formValues:
 export async function continueGraphWorkflow(ticket: any, workflow: any, action: string) {
   const { nodes, edges } = graphOf(workflow);
   if (!nodes.length || !edges.length) return { ticket, handled: false };
-  const current = nodes.find((node) => node.id === ticket.current_step_node_id);
+  const tid = (inputTicket: any) => inputTicket.TicketID ?? inputTicket.id;
+  const current = nodes.find((node) => node.id === (ticket.CurrentStepNodeID ?? ticket.current_step_node_id));
   if (!current || current.type !== 'approval') return { ticket, handled: false };
-  if (action === 'rejected') return { ticket: await dbUpdate('tickets', ticket.id, { status: 'rejected', current_assignees_json: [], closed_at: new Date().toISOString(), date_updated: new Date().toISOString() }), handled: true };
+  if (action === 'rejected') return { ticket: await dbUpdate('Tickets', tid(ticket), { Status: 'rejected', CurrentAssigneesJson: [], ClosedAt: new Date().toISOString(), DateUpdated: new Date().toISOString() }), handled: true };
   if (action !== 'approved') return { ticket, handled: false };
   const edge = nextEdge(edges, current.id, ['approve', 'true', 'out']);
-  if (!edge) return { ticket: await dbUpdate('tickets', ticket.id, { status: 'approved', current_assignees_json: [], solved_at: new Date().toISOString(), date_updated: new Date().toISOString() }), handled: true };
+  if (!edge) return { ticket: await dbUpdate('Tickets', tid(ticket), { Status: 'approved', CurrentAssigneesJson: [], SolvedAt: new Date().toISOString(), DateUpdated: new Date().toISOString() }), handled: true };
   return { ticket: await run(ticket, workflow, edge.target), handled: true };
 }

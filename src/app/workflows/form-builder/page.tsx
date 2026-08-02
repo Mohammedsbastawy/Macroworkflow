@@ -11,7 +11,7 @@ import {
   fetchTravelZonesAction,
 } from "@/app/actions/workflowActions";
 import { WorkflowCanvas } from "@/components/builder/WorkflowCanvas";
-import { TransportationRouteControl } from "@/components/forms/TransportationRouteControl";
+import { TransportationRouteControl, type TravelLimits } from "@/components/forms/TransportationRouteControl";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
@@ -49,6 +49,8 @@ export interface ExtendedFormField {
   minNumber?: number;
   maxNumber?: number;
   allowedFileTypes?: string;
+  // Travel Route & Allowance optional per-item expense limits (EGP)
+  travelLimits?: TravelLimits;
 }
 
 function SearchableSelect({
@@ -922,7 +924,7 @@ function FormBuilderInner() {
 
                       {field.type === "transportation_route" && (
                         <div style={{ pointerEvents: "none" }}>
-                          <TransportationRouteControl value={[]} onChange={() => {}} />
+                          <TransportationRouteControl value={[]} onChange={() => {}} limits={field.travelLimits} />
                         </div>
                       )}
                     </div>
@@ -1085,6 +1087,42 @@ function FormBuilderInner() {
                         </div>
                       </div>
                     )}
+
+                    {editingField.type === "transportation_route" && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, borderTop: "1px dashed var(--color-border)", paddingTop: 12 }}>
+                        <div style={{ fontSize: 11, fontWeight: 800 }}>📏 {lang === "ar" ? "سقوف المصاريف لكل بند (بالجنية المصري)" : "Per-Item Expense Limits (EGP)"}</div>
+                        <div style={{ fontSize: 10, color: "var(--color-text-muted)" }}>
+                          {lang === "ar"
+                            ? "اترك الخانة فارغة لعدم وجود سقف. عند تجاوز الموظف للسقف يظهر تنبيه بأنه تجاوز الحد المسموح دون كشف قيمته."
+                            : "Leave blank for no limit. When an employee exceeds a limit, a warning appears without revealing its value."}
+                        </div>
+                        {[
+                          { key: "meal", label: "🍔 وجبات" },
+                          { key: "coffee", label: "☕ قهوة" },
+                          { key: "parking", label: "🅿️ باركينج" },
+                          { key: "correspondence", label: "✉️ مراسلات" },
+                          { key: "ticketCost", label: "🎟️ تذكرة سفر" },
+                        ].map(cfg => (
+                          <div key={cfg.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ width: 150, fontSize: 11, fontWeight: 700 }}>{cfg.label} (ج.م)</span>
+                            <input
+                              type="number"
+                              className="form-control"
+                              style={{ fontSize: 12 }}
+                              placeholder={lang === "ar" ? "بدون سقف" : "No limit"}
+                              value={editingField.travelLimits?.[cfg.key as keyof TravelLimits] ?? ""}
+                              onChange={e => {
+                                const v = e.target.value;
+                                const next = { ...(editingField.travelLimits || {}) } as TravelLimits;
+                                if (v === "") delete next[cfg.key as keyof TravelLimits];
+                                else next[cfg.key as keyof TravelLimits] = Number(v);
+                                updateEditingField({ travelLimits: next });
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1212,8 +1250,12 @@ function FormBuilderInner() {
                                         <td style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700 }}>250.00 ج.م</td>
                                       </tr>
                                       <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-                                        <td style={{ padding: "8px 10px", textAlign: "right" }}>🍔 بدل الوجبات والإقامة (Meals & Overnight Allowance)</td>
+                                        <td style={{ padding: "8px 10px", textAlign: "right" }}>🍔 الوجبات (Meals)</td>
                                         <td style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700 }}>150.00 ج.م</td>
+                                      </tr>
+                                      <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                                        <td style={{ padding: "8px 10px", textAlign: "right" }}>☕ القهوة (Coffee)</td>
+                                        <td style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700 }}>30.00 ج.م</td>
                                       </tr>
                                       <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
                                         <td style={{ padding: "8px 10px", textAlign: "right" }}>🅿️ رسوم باركينج ومراسلات (Parking & Misc Costs)</td>
@@ -1646,7 +1688,7 @@ function FormBuilderInner() {
                     )}
 
                     {field.type === "transportation_route" && (
-                      <TransportationRouteControl value={[]} onChange={() => {}} />
+                      <TransportationRouteControl value={[]} onChange={() => {}} limits={field.travelLimits} />
                     )}
                   </div>
                 );

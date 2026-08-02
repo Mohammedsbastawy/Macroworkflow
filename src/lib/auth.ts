@@ -23,15 +23,25 @@ declare module "next-auth" {
 async function findUserById(id: string): Promise<any | null> {
   const { dbGet } = await import("@/lib/db/mysqlClient");
   const { normalizeRole } = await import("@/lib/auth/role");
-  const rows = await dbGet("system_users", { id });
+  const rows = await dbGet("Users", { UserID: id });
   const u = rows[0];
   if (!u) return null;
-  const role = normalizeRole(u.role || "selfservice");
+  const role = normalizeRole(u.Role || "selfservice");
   let roles: string[];
-  if (Array.isArray(u.roles_json)) roles = u.roles_json.map(normalizeRole);
-  else if (Array.isArray(u.roles)) roles = u.roles.map(normalizeRole);
+  if (Array.isArray(u.RolesJson)) roles = u.RolesJson.map(normalizeRole);
+  else if (Array.isArray(u.Roles)) roles = u.Roles.map(normalizeRole);
   else roles = [role];
-  return { ...u, role, roles };
+  return {
+    ...u,
+    id: u.UserID,
+    name: u.UserName,
+    email: u.UserEmail,
+    role,
+    roles,
+    is_active: u.IsActive,
+    password_hash: u.PasswordHash,
+    auth_type: u.AuthType,
+  };
 }
 
 async function verifyPassword(user: any, password: string): Promise<boolean> {
@@ -68,15 +78,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (type === "microsoft") {
           const email = String(credentials?.email || "").toLowerCase();
           const { dbGet } = await import("@/lib/db/mysqlClient");
-          const rows = await dbGet("system_users", { email });
+          const rows = await dbGet("Users", { UserEmail: email });
           const user = rows[0];
-          if (!user || !user.is_active) return null;
+          if (!user) return null;
           const { normalizeRole } = await import("@/lib/auth/role");
-          const role = normalizeRole(user.role || "selfservice");
+          const role = normalizeRole(user.Role || "selfservice");
           let roles: string[];
-          if (Array.isArray(user.roles_json)) roles = user.roles_json.map(normalizeRole);
+          if (Array.isArray(user.RolesJson)) roles = user.RolesJson.map(normalizeRole);
           else roles = [role];
-          return { id: user.id, name: user.name, email: user.email, role, roles };
+          return { id: user.UserID, name: user.UserName, email: user.UserEmail, role, roles };
         }
         return null;
       },

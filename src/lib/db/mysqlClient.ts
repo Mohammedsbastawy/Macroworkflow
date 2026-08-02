@@ -15,26 +15,52 @@ const pool = mysql.createPool({
 
 // JSON Column lists to automatically parse/serialize
 const JSON_KEYS = [
-  'steps_json',
-  'fields_json',
-  'react_flow_graph_json',
-  'visibility_rules_json',
-  'workflow_snapshot_json',
-  'current_assignees_json',
-  'value_json',
-  'group_ids_json',
-  'member_user_ids_json',
-  'target_group_ids_json',
-  'target_department_ids_json',
-  'rules_json',
-  'auth_config_json',
-  'department_ids_json',
-  'trigger_rules_json',
-  'initial_form_data',
-  'execution_path_json',
-  'metadata_json',
-  'roles_json'
+  'StepsJson',
+  'FieldsJson',
+  'ReactFlowGraphJson',
+  'VisibilityRulesJson',
+  'WorkflowSnapshotJson',
+  'CurrentAssigneesJson',
+  'ValueJson',
+  'GroupIDsJson',
+  'MemberUserIDsJson',
+  'TargetGroupIDsJson',
+  'TargetDepartmentIDsJson',
+  'RulesJson',
+  'AuthConfigJson',
+  'DepartmentIDsJson',
+  'TriggerRulesJson',
+  'InitialFormData',
+  'ExecutionPathJson',
+  'MetadataJson',
+  'RolesJson',
+  'Attachments'
 ];
+
+// Primary key column per table (PascalCase naming scheme)
+const TABLE_PK: Record<string, string> = {
+  Departments: 'DepartmentID',
+  Users: 'UserID',
+  BusinessGroups: 'BusinessGroupID',
+  SystemUserGroups: 'SystemUserGroupID',
+  Workflows: 'WorkflowID',
+  Tickets: 'TicketID',
+  TicketValues: 'TicketValueID',
+  TicketObservers: 'TicketObserverID',
+  TicketAssignees: 'TicketAssigneeID',
+  TicketComments: 'TicketCommentID',
+  ApprovalLog: 'ApprovalLogID',
+  ExternalApiEndpoints: 'ExternalApiEndpointID',
+  Policies: 'PolicyID',
+  Budgets: 'BudgetID',
+  TravelZones: 'TravelZoneID',
+  PolicyTravelRates: 'PolicyTravelRateID',
+  Notifications: 'NotificationID',
+};
+
+function tablePk(collection: string): string {
+  return TABLE_PK[collection] || 'id';
+}
 
 function formatToMySqlDateTime(val: any): any {
   // Handle Date objects directly
@@ -157,7 +183,8 @@ export async function dbGetOne<T = any>(
   id: string,
   fields?: string[]
 ): Promise<T | null> {
-  const rows = await dbGet<T>(collection, { id }, undefined, 1, fields);
+  const pk = tablePk(collection);
+  const rows = await dbGet<T>(collection, { [pk]: id }, undefined, 1, fields);
   return rows.length > 0 ? rows[0] : null;
 }
 
@@ -165,10 +192,11 @@ export async function dbCreate<T = any>(
   collection: string,
   data: Record<string, any>
 ): Promise<T> {
-  // Auto-generate UUID if no 'id' field is provided (tables use VARCHAR PKs without AUTO_INCREMENT)
+  const pk = tablePk(collection);
+  // Auto-generate UUID if no PK field is provided (tables use VARCHAR PKs without AUTO_INCREMENT)
   const record = { ...data };
-  if (!record.id) {
-    record.id = crypto.randomUUID();
+  if (!record[pk]) {
+    record[pk] = crypto.randomUUID();
   }
 
   const columns = Object.keys(record);
@@ -184,7 +212,7 @@ export async function dbCreate<T = any>(
   const sql = `INSERT INTO \`${collection}\` (${columns.map((c) => `\`${c}\``).join(', ')}) VALUES (${placeholders});`;
 
   const [result] = await pool.query(sql, values);
-  const id = record.id || (result as any).insertId;
+  const id = record[pk] || (result as any).insertId;
 
   const created = await dbGetOne<T>(collection, String(id));
   if (!created) throw new Error(`Insert failed to retrieve record ${id} from ${collection}`);
@@ -196,8 +224,9 @@ export async function dbUpdate<T = any>(
   id: string,
   data: Record<string, any>
 ): Promise<T> {
+  const pk = tablePk(collection);
   const updateData = { ...data };
-  delete updateData.id;
+  delete updateData[pk];
 
   const columns = Object.keys(updateData);
   if (columns.length === 0) {
@@ -215,7 +244,7 @@ export async function dbUpdate<T = any>(
     return formatToMySqlDateTime(val);
   });
 
-  const sql = `UPDATE \`${collection}\` SET ${setClauses} WHERE \`id\` = ?;`;
+  const sql = `UPDATE \`${collection}\` SET ${setClauses} WHERE \`${pk}\` = ?;`;
   await pool.query(sql, [...values, id]);
 
   const updated = await dbGetOne<T>(collection, id);
@@ -227,7 +256,8 @@ export async function dbDelete(
   collection: string,
   id: string
 ): Promise<boolean> {
-  const sql = `DELETE FROM \`${collection}\` WHERE \`id\` = ?;`;
+  const pk = tablePk(collection);
+  const sql = `DELETE FROM \`${collection}\` WHERE \`${pk}\` = ?;`;
   const [result] = await pool.query(sql, [id]);
   return (result as any).affectedRows > 0;
 }
