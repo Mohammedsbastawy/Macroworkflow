@@ -1,8 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePathname } from "next/navigation";
-import { SYSTEM_USERS, SystemUser } from "@/lib/engine/iamStore";
+import { useSession } from "next-auth/react";
+import { SystemUser } from "@/lib/engine/iamStore";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { safeStorage } from "@/lib/safeStorage";
 
 const ROUTE_LABELS: Record<string, { breadcrumb: string[]; titleEn: string; titleAr: string }> = {
   "/": { breadcrumb: [], titleEn: "Dashboard", titleAr: "لوحة التحكم" },
@@ -18,53 +21,100 @@ const ROUTE_LABELS: Record<string, { breadcrumb: string[]; titleEn: string; titl
   "/admin/settings": { breadcrumb: ["Admin"], titleEn: "Settings", titleAr: "الإعدادات" },
 };
 
+interface TopbarUser {
+  id: string;
+  name: string;
+  role: string;
+  avatar_initials?: string;
+  email?: string;
+}
+
 export function Topbar() {
   const pathname = usePathname();
   const { lang, toggleLanguage } = useLanguage();
-  
-  const [currentUser, setCurrentUser] = useState<SystemUser>(SYSTEM_USERS[0]);
-  const [usersList, setUsersList] = useState<SystemUser[]>(SYSTEM_USERS);
+  const { data: session } = useSession();
+
+  const sessionUserId = (session?.user?.id as string) || "";
+  const sessionRole = (session?.user?.role as string) || "";
+  const isAdmin = sessionRole === "admin";
+
+  const [currentUser, setCurrentUser] = useState<TopbarUser | null>(null);
+  const [usersList, setUsersList] = useState<SystemUser[]>([]);
   const [showMobileUserDrawer, setShowMobileUserDrawer] = useState(false);
 
-  const loadUser = async () => {
-    try {
-      const { fetchSystemUsersAction } = await import("@/app/actions/workflowActions");
-      const fetched = await fetchSystemUsersAction();
-      if (fetched && fetched.length > 0) {
-        setUsersList(fetched as any);
-        const savedId = localStorage.getItem("simulated_user_id");
-        const found = fetched.find((u: any) => u.id === savedId) || fetched[0];
+  useEffect(() => {
+    if (!sessionUserId) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const { fetchSystemUsersAction } = await import("@/app/actions/workflowActions");
+        const fetched = (await fetchSystemUsersAction()) as SystemUser[];
+        if (cancelled) return;
+        if (fetched && fetched.length > 0) setUsersList(fetched);
+        const found =
+          fetched?.find((u) => u.id === sessionUserId) ||
+          ({
+            id: sessionUserId,
+            name: session?.user?.name || "User",
+            role: sessionRole,
+            avatar_initials: (session?.user?.name || "U").substring(0, 2).toUpperCase(),
+            email: session?.user?.email || "",
+          } as SystemUser);
         if (found) {
-          setCurrentUser(found as any);
-          localStorage.setItem("system_user", JSON.stringify(found));
+          setCurrentUser(found as unknown as TopbarUser);
+          // Mirror to storage for any remaining storage-based consumers.
+          safeStorage.setItem("system_user", JSON.stringify(found));
+          safeStorage.removeItem("simulated_user_id");
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setCurrentUser({
+            id: sessionUserId,
+            name: session?.user?.name || "User",
+            role: sessionRole,
+            avatar_initials: (session?.user?.name || "U").substring(0, 2).toUpperCase(),
+            email: session?.user?.email || "",
+          });
         }
       }
-    } catch (e) {
-      const savedId = localStorage.getItem("simulated_user_id");
-      if (savedId) {
-        const found = SYSTEM_USERS.find((u) => u.id === savedId);
-        if (found) setCurrentUser(found);
-      }
-    }
-  };
-
-  useEffect(() => {
-    loadUser();
-    const handleSwitch = () => loadUser();
-    window.addEventListener("user-simulated-switch", handleSwitch);
-    return () => window.removeEventListener("user-simulated-switch", handleSwitch);
-  }, []);
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionUserId, sessionRole, session?.user?.name, session?.user?.email]);
 
   const handleSwitchUser = (userId: string) => {
     const found = usersList.find((u) => u.id === userId);
     if (found) {
-      setCurrentUser(found);
-      localStorage.setItem("simulated_user_id", userId);
-      localStorage.setItem("system_user", JSON.stringify(found));
+      setCurrentUser(found as unknown as TopbarUser);
+      safeStorage.setItem("simulated_user_id", userId);
+      safeStorage.setItem("system_user", JSON.stringify(found));
       window.dispatchEvent(new Event("user-simulated-switch"));
       window.dispatchEvent(new Event("system_user_changed"));
     }
   };
+
+  const handleLogout = async () => {
+    try {
+      const { logoutAction } = await import("@/app/actions/authActions");
+      await logoutAction();
+    } catch (e) {}
+    safeStorage.removeItem("simulated_user_id");
+    window.location.href = "/login";
+  };
+
+  const displayUser: TopbarUser = useMemo(
+    () =>
+      currentUser || {
+        id: sessionUserId,
+        name: session?.user?.name || ["W", "O"],
+        role: sessionRole,
+        avatar_initials: (session?.user?.name || "WO").substring(0, 2).toUpperCase(),
+        email: session?.user?.email || "",
+      } as unknown as TopbarUser,
+    [currentUser, sessionUserId, sessionRole, session?.user?.name, session?.user?.email],
+  );
 
   const route = ROUTE_LABELS[pathname] ?? {
     breadcrumb: ["Requests"],
@@ -124,56 +174,85 @@ export function Topbar() {
             <span>{lang === "en" ? "AR" : "EN"}</span>
           </button>
 
-          {/* Desktop IAM User Simulator Dropdown Switcher */}
-          <div className="desktop-only" style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--color-primary-light)", padding: "4px 10px", borderRadius: "var(--radius-md)", border: "1px solid #BFDBFE" }} suppressHydrationWarning>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-primary)" }}>🔑 IAM User:</span>
-            <select
-              className="form-control"
-              style={{ fontSize: 12, padding: "2px 6px", border: "none", background: "none", fontWeight: 700, color: "var(--color-text-primary)", width: "auto" }}
-              value={currentUser.id}
-              onChange={(e) => handleSwitchUser(e.target.value)}
-              suppressHydrationWarning
-            >
-              {usersList.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} ({u.role === 'admin' ? 'ADMIN' : 'SELF SERVICE'})
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* 🔔 Notification Bell — beside language & profile on all viewports */}
+          {displayUser.id && <NotificationBell currentUserId={displayUser.id} />}
+
+          {/* Desktop IAM User Simulator Dropdown (admins only — for support/impersonation) */}
+          {isAdmin && displayUser.id && (
+            <div className="desktop-only" style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--color-primary-light)", padding: "4px 10px", borderRadius: "var(--radius-md)", border: "1px solid #BFDBFE" }} suppressHydrationWarning>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-primary)" }}>🔑 IAM User:</span>
+              <select
+                className="form-control"
+                style={{ fontSize: 12, padding: "2px 6px", border: "none", background: "none", fontWeight: 700, color: "var(--color-text-primary)", width: "auto" }}
+                value={displayUser.id}
+                onChange={(e) => handleSwitchUser(e.target.value)}
+                suppressHydrationWarning
+               >
+                  {(usersList.length ? usersList : []).map((u) => {
+                    const roles = Array.isArray((u as any).roles) && (u as any).roles.length ? (u as any).roles : [(u as any).role];
+                    const roleText = roles.map((r: string) => r === 'admin' ? 'ADMIN' : r === 'agent' ? 'AGENT' : 'SELF SERVICE').join(', ');
+                    return (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({roleText})
+                      </option>
+                    );
+                  })}
+               </select>
+            </div>
+          )}
 
           {/* Mobile IAM Quick Switcher Trigger (Opens Drawer) */}
+          {isAdmin && displayUser.id && (
+            <button
+              className="mobile-only-user-btn"
+              onClick={() => setShowMobileUserDrawer(true)}
+              title={`Active User: ${displayUser.name} (${displayUser.role}). Tap to switch user.`}
+              style={{
+                display: "none",
+                alignItems: "center",
+                gap: 4,
+                background: "var(--color-primary-light)",
+                border: "1px solid #BFDBFE",
+                padding: "5px 10px",
+                borderRadius: "var(--radius-md)",
+                fontSize: 11,
+                fontWeight: 800,
+                color: "var(--color-primary)",
+              }}
+            >
+              <span>👤 {displayUser.avatar_initials}</span>
+            </button>
+          )}
+
+          <div className="topbar-avatar desktop-only" title={displayUser.name} suppressHydrationWarning>
+            {displayUser.avatar_initials}
+          </div>
+
           <button
-            className="mobile-only-user-btn"
-            onClick={() => setShowMobileUserDrawer(true)}
-            title={`Active User: ${currentUser.name} (${currentUser.role}). Tap to switch user.`}
+            onClick={handleLogout}
+            title="Sign out"
             style={{
-              display: "none",
+              display: "inline-flex",
               alignItems: "center",
               gap: 4,
-              background: "var(--color-primary-light)",
-              border: "1px solid #BFDBFE",
+              background: "var(--color-bg)",
+              border: "1px solid var(--color-border)",
               padding: "5px 10px",
               borderRadius: "var(--radius-md)",
-              fontSize: 11,
+              cursor: "pointer",
+              fontSize: 12,
               fontWeight: 800,
-              color: "var(--color-primary)",
+              color: "#EF4444",
             }}
           >
-            <span>👤 {currentUser.avatar_initials}</span>
+            <span>⎋</span>
+            <span className="desktop-only">Sign out</span>
           </button>
-
-          <button className="icon-btn desktop-only" title="Notifications">
-            🔔<span className="dot" />
-          </button>
-          <div className="topbar-avatar desktop-only" title={currentUser.name} suppressHydrationWarning>
-            {currentUser.avatar_initials}
-          </div>
         </div>
       </header>
 
       {/* 📱 DEDICATED MOBILE USER SELECTOR BOTTOM SHEET DRAWER */}
-      {showMobileUserDrawer && (
+      {showMobileUserDrawer && isAdmin && (
         <div
           className="mobile-drawer-backdrop"
           onClick={() => setShowMobileUserDrawer(false)}
@@ -223,7 +302,7 @@ export function Topbar() {
             {/* Users List */}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 6 }}>
               {usersList.map((u) => {
-                const isSelected = u.id === currentUser.id;
+                const isSelected = u.id === displayUser.id;
                 return (
                   <div
                     key={u.id}
@@ -256,14 +335,14 @@ export function Topbar() {
                         fontSize: 14,
                       }}
                     >
-                      {u.avatar_initials}
+                      {(u as any).avatar_initials || u.name?.substring(0, 2).toUpperCase()}
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 14, fontWeight: 800, color: isSelected ? "var(--color-primary)" : "var(--color-text-primary)" }}>
                         {u.name}
                       </div>
                       <div style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
-                        {u.job_title || u.role} · {u.department_id || "Enterprise"}
+                        {(u as any).job_title || (u as any).role} · {(u as any).department_id || "Enterprise"}
                       </div>
                     </div>
                     <span
@@ -272,11 +351,11 @@ export function Topbar() {
                         borderRadius: 8,
                         fontSize: 10,
                         fontWeight: 800,
-                        background: u.role === "admin" ? "#FEF3C7" : "#F3F4F6",
-                        color: u.role === "admin" ? "#92400E" : "#374151",
+                        background: (u as any).role === "admin" ? "#FEF3C7" : (u as any).role === "agent" ? "#DBEAFE" : "#F3F4F6",
+                        color: (u as any).role === "admin" ? "#92400E" : (u as any).role === "agent" ? "#1E40AF" : "#374151",
                       }}
                     >
-                      {u.role === "admin" ? "ADMIN" : "SELF SERVICE"}
+                      {(u as any).role === "admin" ? "ADMIN" : (u as any).role === "agent" ? "AGENT" : "SELF SERVICE"}
                     </span>
                   </div>
                 );

@@ -33,13 +33,26 @@ export default function RequestsPage() {
 
   useEffect(() => {
     const load = async () => {
-      const savedId = typeof window !== 'undefined' ? localStorage.getItem('simulated_user_id') : null;
-      const savedUser = (typeof window !== 'undefined' && savedId) ? (JSON.parse(localStorage.getItem('system_user') || 'null') || null) : null;
-      setCurrentUser(savedUser);
+      try {
+        const savedId = typeof window !== 'undefined' ? localStorage.getItem('simulated_user_id') : null;
+        let savedUser = null;
+        try {
+          const rawUser = typeof window !== 'undefined' && savedId ? localStorage.getItem('system_user') : null;
+          if (rawUser) {
+            savedUser = JSON.parse(rawUser);
+          }
+        } catch (e) {
+          console.error("JSON parse error for system_user:", e);
+        }
+        setCurrentUser(savedUser);
 
-      const res = await fetchInvolvedRequestsAction(savedId || undefined);
-      setRequests((res.requests || []) as RequestItem[]);
-      setLoading(false);
+        const res = await fetchInvolvedRequestsAction(savedId || undefined);
+        setRequests((res?.requests || []) as RequestItem[]);
+      } catch (err) {
+        console.error("Error loading requests:", err);
+      } finally {
+        setLoading(false);
+      }
     };
     load();
   }, []);

@@ -26,7 +26,7 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
   const [departments, setDepartments] = useState<Department[]>([]);
   const [businessGroups, setBusinessGroups] = useState<BusinessGroup[]>([]);
 
-  const [activeTab, setActiveTab] = useState<"profile" | "role" | "delegation" | "reports">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "role" | "delegation" | "reports" | "security">("profile");
 
   // User Form State
   const [name, setName] = useState("");
@@ -37,10 +37,17 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
   const [directManagerId, setDirectManagerId] = useState("");
   const [unit, setUnit] = useState("");
   const [role, setRole] = useState<string>("selfservice");
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(["selfservice"]);
   const [isActive, setIsActive] = useState(true);
   const [avatarInitials, setAvatarInitials] = useState("");
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   const [canAssignGroupTickets, setCanAssignGroupTickets] = useState(false);
+
+  // Security / Login States
+  const [securityUsername, setSecurityUsername] = useState("");
+  const [securityPassword, setSecurityPassword] = useState("");
+  const [authType, setAuthType] = useState<string>("password");
+  const [hasPassword, setHasPassword] = useState(false);
 
   // Delegation States
   const [delegationEnabled, setDelegationEnabled] = useState(false);
@@ -71,6 +78,7 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
         setDirectManagerId(currentUser.direct_manager_id || "");
         setUnit(currentUser.unit || "");
         setRole(currentUser.role || "selfservice");
+        setSelectedRoles(currentUser.roles || [currentUser.role || "selfservice"]);
         setIsActive(currentUser.is_active !== false);
         setAvatarInitials(currentUser.avatar_initials || (currentUser.name ? currentUser.name.substring(0, 2).toUpperCase() : "US"));
         setSelectedGroupIds(currentUser.group_ids || (currentUser as any).group_ids_json || []);
@@ -82,6 +90,12 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
         setDelegationEndDate((currentUser as any).delegation_end_date || "");
         setDelegationNotes((currentUser as any).delegation_notes || "");
         setCanAssignGroupTickets(Boolean(currentUser.can_assign_group_tickets));
+
+        // Security
+        setSecurityUsername((currentUser as any).username || "");
+        setAuthType((currentUser as any).auth_type || "password");
+        setHasPassword(Boolean((currentUser as any).password_hash));
+        setSecurityPassword("");
       }
       setLoading(false);
     });
@@ -106,6 +120,7 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
         department_id: departmentId,
         group_ids: selectedGroupIds,
         role: role as any,
+        roles: selectedRoles as any,
         avatar_initials: avatarInitials || name.substring(0, 2).toUpperCase(),
         job_title: jobTitle,
         direct_manager_id: directManagerId,
@@ -117,6 +132,9 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
         delegation_end_date: delegationEndDate,
         delegation_notes: delegationNotes,
         can_assign_group_tickets: canAssignGroupTickets ? 1 : 0,
+        username: securityUsername,
+        password: securityPassword || undefined,
+        auth_type: authType as any,
       });
 
       setSaveMsg(lang === "ar" ? "✅ تم حفظ وتحديث بيانات المستخدم بنجاح في قاعدة البيانات!" : "✅ User profile updated successfully!");
@@ -132,6 +150,23 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
     setSelectedGroupIds(prev =>
       prev.includes(groupId) ? prev.filter(g => g !== groupId) : [...prev, groupId]
     );
+  };
+
+  const toggleRole = (roleVal: string) => {
+    setSelectedRoles(prev => {
+      const nextRoles = prev.includes(roleVal)
+        ? prev.filter(r => r !== roleVal)
+        : [...prev, roleVal];
+      
+      const primaryRole = nextRoles.includes("admin")
+        ? "admin"
+        : nextRoles.includes("agent")
+          ? "agent"
+          : "selfservice";
+      setRole(primaryRole);
+      
+      return nextRoles;
+    });
   };
 
   if (loading) {
@@ -194,9 +229,9 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <h2 style={{ fontSize: 20, fontWeight: 900, margin: 0 }}>{name || (lang === "ar" ? "مستخدم جديد" : "New User")}</h2>
-              <span className={`badge ${role === "admin" ? "urgent" : role === "selfservice" ? "draft" : "draft"}`}>
-                {role.toUpperCase()}
-              </span>
+               <span className={`badge ${role === "admin" ? "urgent" : role === "selfservice" ? "draft" : role === "agent" ? "info" : "draft"}`}>
+                 {role.toUpperCase()}
+               </span>
               <span className={`badge ${isActive ? "success" : "urgent"}`}>
                 {isActive ? (lang === "ar" ? "نشط ✓" : "Active ✓") : (lang === "ar" ? "معطل ✕" : "Inactive ✕")}
               </span>
@@ -250,6 +285,12 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
             onClick={() => setActiveTab("reports")}
           >
             👥 {lang === "ar" ? `المرؤوسون التابعون (${directReports.length})` : `Direct Reports (${directReports.length})`}
+          </button>
+          <button
+            className={`btn btn-sm ${activeTab === "security" ? "btn-primary" : "btn-outline"}`}
+            onClick={() => setActiveTab("security")}
+          >
+            🔐 {lang === "ar" ? "تسجيل الدخول والأمان" : "Login & Security"}
           </button>
         </div>
 
@@ -401,13 +442,13 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
             </h3>
             
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 14, background: role === "admin" ? "var(--color-primary-light)" : "var(--color-bg)", borderRadius: 8, border: "1px solid var(--color-border)", cursor: "pointer" }}>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 14, background: selectedRoles.includes("admin") ? "var(--color-primary-light)" : "var(--color-bg)", borderRadius: 8, border: "1px solid var(--color-border)", cursor: "pointer" }}>
                 <input
-                  type="radio"
+                  type="checkbox"
                   name="userRole"
                   value="admin"
-                  checked={role === "admin"}
-                  onChange={() => setRole("admin")}
+                  checked={selectedRoles.includes("admin")}
+                  onChange={() => toggleRole("admin")}
                   style={{ marginTop: 4 }}
                 />
                 <div>
@@ -418,13 +459,13 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
                 </div>
               </label>
 
-              <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 14, background: role === "selfservice" ? "var(--color-primary-light)" : "var(--color-bg)", borderRadius: 8, border: "1px solid var(--color-border)", cursor: "pointer" }}>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 14, background: selectedRoles.includes("selfservice") ? "var(--color-primary-light)" : "var(--color-bg)", borderRadius: 8, border: "1px solid var(--color-border)", cursor: "pointer" }}>
                 <input
-                  type="radio"
+                  type="checkbox"
                   name="userRole"
                   value="selfservice"
-                  checked={role === "selfservice"}
-                  onChange={() => setRole("selfservice")}
+                  checked={selectedRoles.includes("selfservice")}
+                  onChange={() => toggleRole("selfservice")}
                   style={{ marginTop: 4 }}
                 />
                 <div>
@@ -434,7 +475,24 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
                   </div>
                 </div>
               </label>
- 
+
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 14, background: selectedRoles.includes("agent") ? "var(--color-primary-light)" : "var(--color-bg)", borderRadius: 8, border: "1px solid var(--color-border)", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  name="userRole"
+                  value="agent"
+                  checked={selectedRoles.includes("agent")}
+                  onChange={() => toggleRole("agent")}
+                  style={{ marginTop: 4 }}
+                />
+                <div>
+                  <strong style={{ fontSize: 13 }}>🛡️ {lang === "ar" ? "وكيل دعم (Agent)" : "Agent"}</strong>
+                  <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 2 }}>
+                    {lang === "ar" ? "صلاحية عرض الطلبات داخل القطاع وتمثيل العملاء في معالجة التذاكر." : "Ability to view requests within department and assist in ticket processing."}
+                  </div>
+                </div>
+              </label>
+  
               <div style={{ marginTop: 16, borderTop: "1px dashed var(--color-border)", paddingTop: 16 }}>
                 <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
                   <input
@@ -453,6 +511,68 @@ export default function DedicatedUserProfilePage({ params }: { params: Promise<{
                   </div>
                 </label>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: LOGIN & SECURITY */}
+        {activeTab === "security" && (
+          <div className="card" style={{ padding: 24, border: "1px solid var(--color-border)", borderRadius: 12 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 6 }}>
+              🔐 {lang === "ar" ? "إعدادات تسجيل الدخول (Sign-in & Security):" : "Sign-in & Security Settings:"}
+            </h3>
+            <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 18px" }}>
+              {lang === "ar" ? "حدد كيف يسجل هذا الموظف دخوله، واسم المستخدم/كلمة المرور للدخول المحلي." : "Choose how this employee signs in, and set their username/password for local (password) sign-in."}
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontWeight: 800 }}>
+                  {lang === "ar" ? "طريقة تسجيل الدخول (Sign-in Method):" : "Sign-in Method:"}
+                </label>
+                <select className="form-control" value={authType} onChange={e => setAuthType(e.target.value)}>
+                  <option value="password">Username / Password</option>
+                  <option value="microsoft">Microsoft 365 (SSO)</option>
+                  <option value="both">Both password & Microsoft 365</option>
+                </select>
+              </div>
+
+              {(authType === "password" || authType === "both") && (
+                <>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontWeight: 700 }}>
+                      {lang === "ar" ? "اسم المستخدم (Username)" : "Username"}
+                    </label>
+                    <input
+                      className="form-control"
+                      value={securityUsername}
+                      onChange={e => setSecurityUsername(e.target.value)}
+                      placeholder="e.g. ahmed.mohamed"
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontWeight: 700 }}>
+                      {lang === "ar" ? "كلمة المرور الجديدة (New Password)" : "New Password"}
+                    </label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      value={securityPassword}
+                      onChange={e => setSecurityPassword(e.target.value)}
+                      placeholder={hasPassword ? (lang === "ar" ? "اتركها فارغة للإبقاء على كلمة المرور الحالية" : "Leave blank to keep current password") : (lang === "ar" ? "أدخل كلمة مرور أولية" : "Set initial password")}
+                    />
+                    {hasPassword && (
+                      <div style={{ fontSize: 11, color: "#059669", marginTop: 4 }}>✓ Password is set. Leave blank to keep it.</div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {authType === "microsoft" && (
+                <div style={{ fontSize: 12, color: "var(--color-text-secondary)", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, padding: "12px" }}>
+                  ☁ {lang === "ar" ? "هذا الموظف سيسجل دخوله بحسابه في Microsoft 365 (بريده الرسمي). تأكد من أن البريد الإلكتروني في بياناته يطابق بريده العملي تماماً، وأن إعدادات Microsoft 365 مفعّلة من صفحة الإعدادات." : "This employee will sign in with their Microsoft 365 work account. Make sure their email matches their corporate email exactly, and that Microsoft 365 integration is enabled in Settings."}
+                </div>
+              )}
             </div>
           </div>
         )}

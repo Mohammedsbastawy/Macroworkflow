@@ -1,57 +1,63 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { SYSTEM_USERS, SystemUser, DEFAULT_ROLE_PERMISSIONS } from "@/lib/engine/iamStore";
+import { useSession } from "next-auth/react";
+import { SystemUser, DEFAULT_ROLE_PERMISSIONS } from "@/lib/engine/iamStore";
+import { safeStorage } from "@/lib/safeStorage";
 
 export interface AuthGuardProps {
   children: React.ReactNode;
   requiredModule?: keyof typeof DEFAULT_ROLE_PERMISSIONS.admin.modules;
-  allowRoles?: Array<'admin' | 'selfservice'>;
+  allowRoles?: Array<'admin' | 'selfservice' | 'agent'>;
 }
 
 export function AuthGuard({ children, requiredModule, allowRoles }: AuthGuardProps) {
+  const { data: session, status } = useSession();
   const [currentUser, setCurrentUser] = useState<SystemUser | null>(null);
-  const [isHydrated, setIsHydrated] = useState(false);
+
+  const sessionUserId = (session?.user?.id as string) || "";
 
   useEffect(() => {
-    const updateAuth = async () => {
-      const stored = localStorage.getItem("system_user");
-      let found = null;
+    if (status !== "authenticated" || !sessionUserId) return;
+    let cancelled = false;
+    const resolve = async () => {
       try {
         const { fetchSystemUsersAction } = await import("@/app/actions/workflowActions");
         const dbUsers = await fetchSystemUsersAction();
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          found = dbUsers.find((u: any) => u.id === parsed.id);
-        }
-        if (!found && dbUsers.length > 0) {
-          // Check simulated_user_id too
-          const savedId = localStorage.getItem("simulated_user_id");
-          found = dbUsers.find((u: any) => u.id === savedId) || dbUsers[0];
+        if (cancelled) return;
+        const found = dbUsers.find((u: any) => u.id === sessionUserId);
+        if (found) {
+          setCurrentUser(found as any);
+          // Mirror to storage so existing downstream components (Topbar, etc.) stay in sync.
+          safeStorage.setItem("system_user", JSON.stringify(found));
+          safeStorage.removeItem("simulated_user_id");
         }
       } catch (e) {
-        console.error(e);
-      }
-
-      if (found) {
-        setCurrentUser(found as any);
-        localStorage.setItem("system_user", JSON.stringify(found));
-      } else {
-        setCurrentUser(SYSTEM_USERS[0]);
+        console.error("Failed to resolve authenticated user in AuthGuard:", e);
       }
     };
+    resolve();
+    return () => {
+      cancelled = true;
+    };
+  }, [status, sessionUserId]);
 
-    updateAuth();
-    setIsHydrated(true);
-
-    window.addEventListener("system_user_changed", updateAuth);
-    return () => window.removeEventListener("system_user_changed", updateAuth);
-  }, []);
-
-  if (!isHydrated || !currentUser) {
+  if (status === "loading" || (status === "authenticated" && !currentUser)) {
     return (
       <div style={{ padding: 40, textAlign: "center", color: "var(--color-text-muted)" }}>
         🔒 Verifying enterprise permissions & security credentials...
+      </div>
+    );
+  }
+
+  if (status === "unauthenticated" || !currentUser) {
+    return (
+      <div style={{ padding: 40, textAlign: "center", color: "var(--color-text-muted)" }}>
+        <div style={{ fontSize: 40, marginBottom: 8 }}>🔐</div>
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>You are not signed in.</div>
+        <Link href="/login">
+          <button className="btn btn-primary">Sign in</button>
+        </Link>
       </div>
     );
   }

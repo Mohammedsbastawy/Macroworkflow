@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { SYSTEM_USERS, SystemUser } from "@/lib/engine/iamStore";
+import { safeStorage } from "@/lib/safeStorage";
 
 export function MobileBottomNav() {
   const pathname = usePathname();
@@ -13,7 +14,7 @@ export function MobileBottomNav() {
 
   useEffect(() => {
     const loadUser = () => {
-      const savedId = localStorage.getItem("simulated_user_id");
+      const savedId = safeStorage.getItem("simulated_user_id");
       if (savedId) {
         const found = SYSTEM_USERS.find((u) => u.id === savedId);
         if (found) setCurrentUser(found);
@@ -51,17 +52,17 @@ export function MobileBottomNav() {
       labelEn: "My Requests",
       labelAr: "طلباتي",
     },
-    {
-      href: currentUser.role === "admin" ? "/admin/users" : "/portal",
-      icon: "👤",
-      labelEn: currentUser.role === "admin" ? "Admin" : "Profile",
-      labelAr: currentUser.role === "admin" ? "الإدارة" : "حسابي",
-    },
-  ];
+     {
+       href: (currentUser?.roles && currentUser.roles.includes("admin")) || currentUser?.role === "admin" ? "/admin/users" : (currentUser?.roles && currentUser.roles.includes("agent")) || currentUser?.role === "agent" ? "/requests" : "/portal",
+       icon: "👤",
+       labelEn: (currentUser?.roles && currentUser.roles.includes("admin")) || currentUser?.role === "admin" ? "Admin" : (currentUser?.roles && currentUser.roles.includes("agent")) || currentUser?.role === "agent" ? "Requests" : "Profile",
+       labelAr: (currentUser?.roles && currentUser.roles.includes("admin")) || currentUser?.role === "admin" ? "الإدارة" : (currentUser?.roles && currentUser.roles.includes("agent")) || currentUser?.role === "agent" ? "الطلبات" : "حسابي",
+     },
+   ];
 
   return (
     <nav className="mobile-bottom-nav">
-      {navItems.map((item) => {
+      {navItems.map((item, index) => {
         const isActive = item.exact
           ? pathname === item.href
           : pathname.startsWith(item.href) && item.href !== "/";
@@ -70,7 +71,7 @@ export function MobileBottomNav() {
 
         return (
           <Link
-            key={item.href}
+            key={`${item.href}-${index}`}
             href={item.href}
             className={`mobile-nav-tab ${isActive ? "active" : ""} ${
               item.highlight ? "highlight" : ""

@@ -353,6 +353,10 @@ function FormBuilderInner() {
   const [tempAssignedGroup, setTempAssignedGroup] = useState("");
   const [tempAssignedUser, setTempAssignedUser] = useState("");
   const [tempObservers, setTempObservers] = useState("");
+  const [tempSlaTtoValue, setTempSlaTtoValue] = useState<number>(1);
+  const [tempSlaTtoUnit, setTempSlaTtoUnit] = useState<string>("Hours");
+  const [tempSlaTtrValue, setTempSlaTtrValue] = useState<number>(24);
+  const [tempSlaTtrUnit, setTempSlaTtrUnit] = useState<string>("Hours");
   const [tempSlaTto, setTempSlaTto] = useState("");
   const [tempSlaTtr, setTempSlaTtr] = useState("");
   const [tempTotalCost, setTempTotalCost] = useState("");
@@ -378,6 +382,22 @@ function FormBuilderInner() {
   // Workflow Graph
   const [workflowNodes, setWorkflowNodes] = useState<any[]>([]);
   const [workflowEdges, setWorkflowEdges] = useState<any[]>([]);
+
+  // Helper to parse an existing SLA string like "1 Hour" or "30 Minutes" into { value, unit }
+  const parseSlaString = (sla: string): { value: number; unit: string } => {
+    const trimmed = sla.trim();
+    const match = trimmed.match(/^(\d+)\s*(.+)$/);
+    if (match) {
+      let unit = match[2].trim();
+      // Normalize unit format
+      if (unit === "Minute" || unit === "Minutes") unit = "Minutes";
+      else if (unit === "Hour" || unit === "Hours") unit = "Hours";
+      else if (unit === "Day" || unit === "Days") unit = "Days";
+      else if (unit === "Month" || unit === "Months") unit = "Months";
+      return { value: parseInt(match[1], 10), unit };
+    }
+    return { value: 1, unit: "Hours" };
+  };
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -517,6 +537,32 @@ function FormBuilderInner() {
     setFields(prev => prev.map(f => f.id === updated.id ? updated : f));
   };
 
+  // Persist form to MySQL database (shared by full save and the panel "Save" button)
+  const persistForm = async (panelCfg?: typeof panelConfig) => {
+    const slug = editId || `form-${formTitle.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${Date.now()}`;
+    await createWorkflowFormAction({
+      id: editId || undefined,
+      name: formTitle,
+      slug,
+      category: formCategory,
+      description: formDescription,
+      icon: formIcon,
+      color: formColor,
+      fields,
+      visibility_rules: {
+        is_global: visibilityScope === "global",
+        department_ids: visibilityScope === "global" ? [] : targetDeptIds,
+        group_ids: visibilityScope === "global" ? [] : targetGroupIds,
+        user_ids: [],
+        ticket_info_panel_config: panelCfg || panelConfig,
+      },
+      react_flow_graph: {
+        nodes: workflowNodes,
+        edges: workflowEdges,
+      },
+    });
+  };
+
   // Save Complete Form & Workflow
   const handleSaveForm = async () => {
     if (!formTitle.trim()) {
@@ -527,28 +573,7 @@ function FormBuilderInner() {
     setSaveSuccess(false);
 
     try {
-      const slug = editId || `form-${formTitle.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${Date.now()}`;
-      await createWorkflowFormAction({
-        id: editId || undefined,
-        name: formTitle,
-        slug,
-        category: formCategory,
-        description: formDescription,
-        icon: formIcon,
-        color: formColor,
-        fields,
-        visibility_rules: {
-          is_global: visibilityScope === "global",
-          department_ids: visibilityScope === "global" ? [] : targetDeptIds,
-          group_ids: visibilityScope === "global" ? [] : targetGroupIds,
-          user_ids: [],
-          ticket_info_panel_config: panelConfig,
-        },
-        react_flow_graph: {
-          nodes: workflowNodes,
-          edges: workflowEdges,
-        },
-      });
+      await persistForm();
 
       setSaveSuccess(true);
       setTimeout(() => {
@@ -1281,8 +1306,14 @@ function FormBuilderInner() {
                             setTempUnit(panelConfig.defaultUnit || "Brand Alpha - Retail");
                             setTempAssignedGroup(panelConfig.defaultAssignedGroup || "IT Support Group");
                             setTempAssignedUser(panelConfig.defaultAssignedUser || "Khaled Samir (Manager)");
-                            setTempObservers(panelConfig.defaultObservers || "Ahmed Mohamed, Sara Hassan");
+                            setTempObservers(panelConfig.defaultObservers ?? "Ahmed Mohamed, Sara Hassan");
+                            const parsedTto = parseSlaString(panelConfig.defaultSlaTto || "1 Hour");
+                            setTempSlaTtoValue(parsedTto.value);
+                            setTempSlaTtoUnit(parsedTto.unit);
                             setTempSlaTto(panelConfig.defaultSlaTto || "1 Hour");
+                            const parsedTtr = parseSlaString(panelConfig.defaultSlaTtr || "24 Hours");
+                            setTempSlaTtrValue(parsedTtr.value);
+                            setTempSlaTtrUnit(parsedTtr.unit);
                             setTempSlaTtr(panelConfig.defaultSlaTtr || "24 Hours");
                             setTempTotalCost(panelConfig.defaultTotalCost || "1,250.00 EGP");
                           }
@@ -1383,18 +1414,54 @@ function FormBuilderInner() {
                         />
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          <SearchableSelect
-                            label="SLA TTO (Takeover):"
-                            value={tempSlaTto}
-                            onChange={val => setTempSlaTto(val)}
-                            options={["None (تلقائي حسب قواعد العمل)", "30 Minutes", "1 Hour", "2 Hours", "4 Hours", "12 Hours", "24 Hours"]}
-                          />
-                          <SearchableSelect
-                            label="SLA TTR (Resolution):"
-                            value={tempSlaTtr}
-                            onChange={val => setTempSlaTtr(val)}
-                            options={["None (تلقائي حسب قواعد العمل)", "2 Hours", "4 Hours", "8 Hours", "12 Hours", "24 Hours", "48 Hours", "72 Hours"]}
-                          />
+                          <div>
+                            <label style={{ fontSize: 10, fontWeight: 700, display: 'block', marginBottom: 2 }}>SLA TTO (Takeover):</label>
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <input
+                                type="number"
+                                min={1}
+                                className="form-control"
+                                style={{ fontSize: 11, padding: '4px', width: '80px', flexShrink: 0 }}
+                                value={tempSlaTtoValue}
+                                onChange={e => setTempSlaTtoValue(Math.max(1, parseInt(e.target.value) || 1))}
+                              />
+                              <select
+                                className="form-control"
+                                style={{ fontSize: 11, padding: '4px', flex: 1 }}
+                                value={tempSlaTtoUnit}
+                                onChange={e => setTempSlaTtoUnit(e.target.value)}
+                              >
+                                <option value="Minutes">Minutes</option>
+                                <option value="Hours">Hours</option>
+                                <option value="Days">Days</option>
+                                <option value="Months">Months</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 10, fontWeight: 700, display: 'block', marginBottom: 2 }}>SLA TTR (Resolution):</label>
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <input
+                                type="number"
+                                min={1}
+                                className="form-control"
+                                style={{ fontSize: 11, padding: '4px', width: '80px', flexShrink: 0 }}
+                                value={tempSlaTtrValue}
+                                onChange={e => setTempSlaTtrValue(Math.max(1, parseInt(e.target.value) || 1))}
+                              />
+                              <select
+                                className="form-control"
+                                style={{ fontSize: 11, padding: '4px', flex: 1 }}
+                                value={tempSlaTtrUnit}
+                                onChange={e => setTempSlaTtrUnit(e.target.value)}
+                              >
+                                <option value="Minutes">Minutes</option>
+                                <option value="Hours">Hours</option>
+                                <option value="Days">Days</option>
+                                <option value="Months">Months</option>
+                              </select>
+                            </div>
+                          </div>
                         </div>
 
                          <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginTop: 6 }}>
@@ -1402,9 +1469,9 @@ function FormBuilderInner() {
                           <button
                             type="button"
                             className="btn btn-sm btn-primary"
-                            onClick={() => {
-                              setPanelConfig(prev => ({
-                                ...prev,
+                            onClick={async () => {
+                              const nextPanelConfig = {
+                                ...panelConfig,
                                 customPanelTitle: tempPanelTitle,
                                 defaultPriority: tempPriority,
                                 defaultUrgency: tempUrgency,
@@ -1415,10 +1482,18 @@ function FormBuilderInner() {
                                 defaultAssignedGroup: tempAssignedGroup,
                                 defaultAssignedUser: tempAssignedUser,
                                 defaultObservers: tempObservers,
-                                defaultSlaTto: tempSlaTto,
-                                defaultSlaTtr: tempSlaTtr,
-                              }));
+                                defaultSlaTto: `${tempSlaTtoValue} ${tempSlaTtoUnit}`,
+                                defaultSlaTtr: `${tempSlaTtrValue} ${tempSlaTtrUnit}`,
+                              };
+                              setPanelConfig(nextPanelConfig);
                               setIsEditingSidebarPanel(false);
+                              if (editId) {
+                                try {
+                                  await persistForm(nextPanelConfig);
+                                } catch (e: any) {
+                                  console.warn('[panel save failed]', e);
+                                }
+                              }
                             }}
                           >
                             Save
@@ -1454,7 +1529,7 @@ function FormBuilderInner() {
                             <div style={{ fontSize: 11, fontWeight: 700 }}>Requester: [Current Submitting Employee] / [الموظف مقدم المعاملة]</div>
                             <div style={{ fontSize: 11, color: "#4F46E5", marginTop: 4, fontWeight: 700 }}>Group: {panelConfig.defaultAssignedGroup || "IT Support Group"}</div>
                             <div style={{ fontSize: 11, color: "#059669", marginTop: 2, fontWeight: 700 }}>Reviewer: {panelConfig.defaultAssignedUser || "Khaled Samir (Manager)"}</div>
-                            <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 4 }}>CC: {panelConfig.defaultObservers || "Mona Omar, Sara Hassan"}</div>
+                            <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 4 }}>CC: {panelConfig.defaultObservers || "—"}</div>
                           </div>
                         )}
 

@@ -46,7 +46,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
     return () => window.removeEventListener("user-simulated-switch", handleSwitch);
   }, [requestId]);
 
-  const handleSubmitApproval = async (action: 'approved' | 'rejected' | 'returned_for_revision', comment: string) => {
+  const handleSubmitApproval = async (action: 'approved' | 'rejected' | 'returned_for_revision' | 'cancelled', comment: string) => {
     const user = getActiveUser();
     await submitApprovalDecisionAction({
       requestId,

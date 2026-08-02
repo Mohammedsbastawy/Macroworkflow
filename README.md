@@ -1,6 +1,6 @@
 # 🌐 Macro Workflow & ITSM System
 
-A modern, no-code Workflow and ITSM Ticket Lifecycle Engine built with **Next.js (React)**, **MySQL**, and **Directus / REST API Integration**, featuring dynamic routing rules and flexible UI panels.
+A modern, no-code Workflow and ITSM Ticket Lifecycle Engine built with **Next.js (React)** and **MySQL**, featuring dynamic routing rules and flexible UI panels.
 
 ---
 

@@ -23,6 +23,7 @@ export async function getDbRoles(): Promise<DbRole[]> {
   return [
     { id: 'role-admin', name: 'Administrator', icon: 'verified_user', admin_access: true, app_access: true },
     { id: 'role-selfservice', name: 'Self-Service Employee', icon: 'person', admin_access: false, app_access: true },
+    { id: 'role-agent', name: 'Agent', icon: 'support_agent', admin_access: false, app_access: true },
   ];
 }
 

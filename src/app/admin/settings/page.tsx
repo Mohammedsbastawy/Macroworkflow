@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { fetchSystemSettingsAction, updateSystemSettingAction } from "@/app/actions/workflowActions";
+import { getEntraSettingsAction, saveEntraSettingsAction } from "@/app/actions/authActions";
 import { SYSTEM_USERS } from "@/lib/engine/iamStore";
 
 const MONTHS = [
@@ -27,6 +28,70 @@ export default function SettingsPage() {
   // Feature Flags State
   const [enableBudgets, setEnableBudgets] = useState("false");
   const [enablePolicies, setEnablePolicies] = useState("false");
+
+  // Microsoft 365 (Entra ID) Integration State
+  const [entra, setEntra] = useState({
+    tenantId: "",
+    clientId: "",
+    clientSecret: "",
+    hasClientSecret: false,
+    redirectUri: "",
+    scopes: "",
+    enabled: false,
+    defaultScopes: "",
+    senderEmail: "",
+    senderName: "",
+    mailEnabled: false,
+  });
+  const [entraSaving, setEntraSaving] = useState(false);
+  const [entraMsg, setEntraMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const loadEntra = async () => {
+    try {
+      const res = await getEntraSettingsAction();
+      setEntra({
+        tenantId: (res as any).tenantId || "",
+        clientId: (res as any).clientId || "",
+        clientSecret: (res as any).hasClientSecret ? "••••••••••••••••" : "",
+        hasClientSecret: (res as any).hasClientSecret,
+        redirectUri: (res as any).redirectUri || "",
+        scopes: (res as any).scopes || "",
+        enabled: (res as any).enabled,
+        defaultScopes: (res as any).defaultScopes || "",
+        senderEmail: (res as any).senderEmail || "",
+        senderName: (res as any).senderName || "",
+        mailEnabled: (res as any).mailEnabled,
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const saveEntra = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEntraSaving(true);
+    setEntraMsg(null);
+    try {
+      await saveEntraSettingsAction({
+        tenantId: entra.tenantId,
+        clientId: entra.clientId,
+        clientSecret: entra.clientSecret,
+        redirectUri: entra.redirectUri,
+        scopes: entra.scopes,
+        enabled: entra.enabled,
+        senderEmail: entra.senderEmail,
+        senderName: entra.senderName,
+        mailEnabled: entra.mailEnabled,
+      });
+      setEntra((p) => ({ ...p, hasClientSecret: p.hasClientSecret || p.clientSecret.trim().length > 0 && !p.clientSecret.includes("••") }));
+      setEntraMsg({ ok: true, text: "Microsoft 365 integration settings saved successfully." });
+      await loadEntra();
+    } catch (err) {
+      setEntraMsg({ ok: false, text: "Error saving Microsoft 365 settings: " + err });
+    } finally {
+      setEntraSaving(false);
+    }
+  };
 
   const loadSettings = async () => {
     setLoading(true);
@@ -55,6 +120,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadSettings();
+    loadEntra();
   }, []);
 
   const handleSaveSetting = async (key: string, val: string) => {
@@ -110,6 +176,7 @@ export default function SettingsPage() {
             {[
               { id: "FiscalYear", label: "📅 Fiscal Year & Financials", labelAr: "إعدادات السنة المالية" },
               { id: "FeatureFlags", label: "⚡ Feature Flags & Toggles", labelAr: "مفاتيح المحرك والخصائص" },
+              { id: "Microsoft365", label: "☁ Microsoft 365 & SSO", labelAr: "مايكروسوفت 365 والدخول الموحد" },
               { id: "General", label: "⚙️ General & Localization", labelAr: "الإعدادات العامة" },
             ].map((tab) => (
               <div
@@ -324,6 +391,163 @@ export default function SettingsPage() {
                   </button>
                 </div>
 
+              </div>
+            </div>
+          ) : activeTab === "Microsoft365" ? (
+            <div className="card">
+              <div className="card-header">
+                <div>
+                  <div className="card-title">☁ Microsoft 365 (Entra ID) Single Sign-On Integration</div>
+                  <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                    Employees sign in with their work email; only their basic profile is synced. Mailbox access is
+                    centralized to one system sender only.
+                  </div>
+                </div>
+                <span className={`badge ${entra.enabled ? "success" : "warning"}`}>
+                  {entra.enabled ? "ENABLED" : "DISABLED"}
+                </span>
+              </div>
+
+              <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {entraMsg && (
+                  <div style={{
+                    padding: "10px 14px", borderRadius: 8, fontSize: 12,
+                    background: entraMsg.ok ? "#ECFDF5" : "#FEF2F2",
+                    border: `1px solid ${entraMsg.ok ? "#A7F3D0" : "#FECACA"}`,
+                    color: entraMsg.ok ? "#065F46" : "#991B1B",
+                  }}>
+                    {entraMsg.text}
+                  </div>
+                )}
+
+                <form onSubmit={saveEntra} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Directory (Tenant) ID *</label>
+                    <input className="form-control" value={entra.tenantId} onChange={(e) => setEntra((p) => ({ ...p, tenantId: e.target.value }))} placeholder="e.g. 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d" />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Application (Client) ID *</label>
+                    <input className="form-control" value={entra.clientId} onChange={(e) => setEntra((p) => ({ ...p, clientId: e.target.value }))} placeholder="e.g. 232a3f1e-...." />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Client Secret *</label>
+                    <input
+                      className="form-control"
+                      type="password"
+                      value={entra.clientSecret}
+                      onChange={(e) => setEntra((p) => ({ ...p, clientSecret: e.target.value }))}
+                      placeholder={entra.hasClientSecret ? "Leave blank to keep the saved secret" : "Paste the client secret value"}
+                    />
+                    {entra.hasClientSecret && (
+                      <div style={{ fontSize: 11, color: "#059669", marginTop: 4 }}>✓ A client secret is already configured. Leave blank to keep it.</div>
+                    )}
+                  </div>
+                  <div className="form-grid-2">
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Redirect URI</label>
+                      <input className="form-control" value={entra.redirectUri} onChange={(e) => setEntra((p) => ({ ...p, redirectUri: e.target.value }))} placeholder="https://your-host/api/auth/microsoft/callback" />
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Sign-in Scopes (delegated)</label>
+                      <input className="form-control" value={entra.scopes} onChange={(e) => setEntra((p) => ({ ...p, scopes: e.target.value }))} />
+                      <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>
+                        Profile-only by default (no mailbox for employees): <code>{entra.defaultScopes}</code>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 12, background: "var(--color-bg)", borderRadius: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 800 }}>Enable "Sign in with Microsoft 365"</span>
+                    <button
+                      type="button"
+                      className={`btn ${entra.enabled ? "btn-primary" : "btn-outline"}`}
+                      onClick={() => setEntra((p) => ({ ...p, enabled: !p.enabled }))}
+                    >
+                      {entra.enabled ? "🟢 ENABLED" : "⚪ DISABLED"}
+                    </button>
+                  </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button className="btn btn-primary" type="submit" disabled={entraSaving}>
+                  {entraSaving ? "Saving..." : "Save Microsoft 365 Settings"}
+                </button>
+              </div>
+            </form>
+
+            {/* Official System Sender Mailbox */}
+            <div style={{ borderTop: "1px dashed var(--color-border)", paddingTop: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-primary)", marginBottom: 6 }}>
+                📧 Official System Sender Mailbox (صندوق الإرسال الرسمي للنظام)
+              </div>
+              <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 12px" }}>
+                The single, centralized mailbox used as the <code>From</code> address for ALL automated system email:
+                approval requests, notifications, SLA alerts and digital documents. This is the ONLY mailbox the system
+                touches — individual employees' mailboxes are never accessed. The app uses an application (app-only)
+                permission (<code>Mail.Send</code>) to send from this one address.
+              </p>
+              <div className="form-grid-2">
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">System Sender Email Address *</label>
+                  <input
+                    className="form-control"
+                    type="email"
+                    value={entra.senderEmail}
+                    onChange={(e) => setEntra((p) => ({ ...p, senderEmail: e.target.value }))}
+                    placeholder="e.g. workflow-system@company.com"
+                  />
+                  <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>
+                    Where automated system emails appear to come from.
+                  </div>
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">System Sender Display Name</label>
+                  <input
+                    className="form-control"
+                    value={entra.senderName}
+                    onChange={(e) => setEntra((p) => ({ ...p, senderName: e.target.value }))}
+                    placeholder="e.g. Macro Workflow System"
+                  />
+                  <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>
+                    Friendly name shown next to the email address.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 12, background: "var(--color-bg)", borderRadius: 8, marginTop: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 800 }}>Enable Microsoft 365 Mailbox Integration</span>
+                <button
+                  type="button"
+                  className={`btn ${entra.mailEnabled ? "btn-primary" : "btn-outline"}`}
+                  onClick={() => setEntra((p) => ({ ...p, mailEnabled: !p.mailEnabled }))}
+                >
+                  {entra.mailEnabled ? "🟢 ENABLED" : "⚪ DISABLED"}
+                </button>
+              </div>
+            </div>
+
+            {/* Step-by-step Azure guide */}
+                <div style={{ borderTop: "1px dashed var(--color-border)", paddingTop: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-primary)", marginBottom: 12 }}>
+                    📘 How to register an app in the Azure Portal & get these credentials
+                  </div>
+                  <ol style={{ fontSize: 12, lineHeight: 1.9, color: "var(--color-text-secondary)", paddingLeft: 18, margin: 0 }}>
+                    <li>Open the <a href="https://portal.azure.com" target="_blank" rel="noreferrer" style={{ color: "var(--color-primary)" }}>Azure Portal</a> → search and open <strong>“Microsoft Entra ID”</strong> (formerly Azure Active Directory).</li>
+                    <li>In the left menu, open <strong>“App registrations”</strong> → click <strong>“New registration.”</strong></li>
+                    <li>Enter a name (e.g. “Macro Workflow System”), choose the supported account type (preferably <strong>“Accounts in this organizational directory only”</strong>), set the redirect URI platform to <strong>“Web”</strong> and paste exactly:
+                      <div style={{ background: "#F1F5F9", padding: "6px 10px", borderRadius: 6, fontFamily: "monospace", fontSize: 11, margin: "6px 0", wordBreak: "break-all" }}>{entra.redirectUri}</div>
+                      then click <strong>Register</strong>.</li>
+                    <li>On the app’s <strong>Overview</strong> page, copy the <strong>Directory (tenant) ID</strong> and the <strong>Application (client) ID</strong>, and paste them into the fields above.</li>
+                    <li>In the left menu, open <strong>“Certificates &amp; secrets”</strong> → <strong>“New client secret”</strong>, choose an expiry, add it, then <strong>copy the Value immediately</strong> (it’s shown only once) and paste it into the Client Secret field above.</li>
+                    <li>Under <strong>“API permissions”</strong> → <strong>“Add a permission”</strong> → <strong>“Microsoft Graph”</strong>:
+                      <ul style={{ marginTop: 4, marginBottom: 4 }}>
+                        <li><strong>Delegated permissions</strong> (only what employees sign in with): <code>User.Read</code>, <code>openid</code>, <code>email</code>, <code>profile</code>, and <code>offline_access</code>. No mailbox permissions for employees.</li>
+                        <li><strong>Application permissions</strong> (for the single system sender mailbox): <code>Mail.Send</code> and <code>Mail.Read</code>.</li>
+                      </ul>
+                      Then click <strong>“Grant admin consent”</strong>.</li>
+                    <li>Click <strong>“Save Microsoft 365 Settings”</strong> above to persist your configuration to the database.</li>
+                    <li>Finally, create user accounts for your employees under <strong>Admin → Users &amp; IAM</strong>, set their <strong>Auth Method</strong> to <strong>Microsoft 365</strong> and make sure their <strong>email matches their work email</strong>.</li>
+                  </ol>
+                </div>
               </div>
             </div>
           ) : (

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { fetchAuthorizedCatalogWorkflowsAction, fetchAllRequestsAction } from "@/app/actions/workflowActions";
+import { fetchAuthorizedCatalogWorkflowsAction, fetchMyRequestsAction } from "@/app/actions/workflowActions";
 import { SYSTEM_USERS, SystemUser } from "@/lib/engine/iamStore";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
@@ -29,7 +29,7 @@ export function SimplifiedPortal() {
         setWorkflows(forms);
       }
 
-      const reqRes = await fetchAllRequestsAction();
+      const reqRes = await fetchMyRequestsAction(user.id);
       if (reqRes?.requests) {
         setMyRequests(reqRes.requests);
       }

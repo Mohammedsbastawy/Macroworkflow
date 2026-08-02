@@ -1,6 +1,6 @@
 import mysql from 'mysql2/promise';
+import crypto from 'crypto';
 
-// --- MySQL Connection Pool ---
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST || 'localhost',
   port: Number(process.env.MYSQL_PORT) || 3306,
@@ -10,6 +10,7 @@ const pool = mysql.createPool({
   connectionLimit: 15,
   waitForConnections: true,
   queueLimit: 0,
+  timezone: '+00:00',
 });
 
 // JSON Column lists to automatically parse/serialize
@@ -23,15 +24,24 @@ const JSON_KEYS = [
   'value_json',
   'group_ids_json',
   'member_user_ids_json',
+  'target_group_ids_json',
+  'target_department_ids_json',
   'rules_json',
   'auth_config_json',
   'department_ids_json',
   'trigger_rules_json',
   'initial_form_data',
-  'execution_path_json'
+  'execution_path_json',
+  'metadata_json',
+  'roles_json'
 ];
 
 function formatToMySqlDateTime(val: any): any {
+  // Handle Date objects directly
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    const pad = (n: number, l = 2) => String(n).padStart(l, '0');
+    return `${val.getUTCFullYear()}-${pad(val.getUTCMonth() + 1)}-${pad(val.getUTCDate())} ${pad(val.getUTCHours())}:${pad(val.getUTCMinutes())}:${pad(val.getUTCSeconds())}.${pad(val.getUTCMilliseconds(), 3)}`;
+  }
   if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
     try {
       const date = new Date(val);
@@ -155,10 +165,16 @@ export async function dbCreate<T = any>(
   collection: string,
   data: Record<string, any>
 ): Promise<T> {
-  const columns = Object.keys(data);
+  // Auto-generate UUID if no 'id' field is provided (tables use VARCHAR PKs without AUTO_INCREMENT)
+  const record = { ...data };
+  if (!record.id) {
+    record.id = crypto.randomUUID();
+  }
+
+  const columns = Object.keys(record);
   const values = columns.map((col) => {
-    const val = data[col];
-    if (val !== null && typeof val === 'object') {
+    const val = record[col];
+    if (val !== null && typeof val === 'object' && !(val instanceof Date)) {
       return JSON.stringify(val);
     }
     return formatToMySqlDateTime(val);
@@ -168,7 +184,7 @@ export async function dbCreate<T = any>(
   const sql = `INSERT INTO \`${collection}\` (${columns.map((c) => `\`${c}\``).join(', ')}) VALUES (${placeholders});`;
 
   const [result] = await pool.query(sql, values);
-  const id = data.id || (result as any).insertId;
+  const id = record.id || (result as any).insertId;
 
   const created = await dbGetOne<T>(collection, String(id));
   if (!created) throw new Error(`Insert failed to retrieve record ${id} from ${collection}`);
@@ -193,7 +209,7 @@ export async function dbUpdate<T = any>(
   const setClauses = columns.map((c) => `\`${c}\` = ?`).join(', ');
   const values = columns.map((col) => {
     const val = updateData[col];
-    if (val !== null && typeof val === 'object') {
+    if (val !== null && typeof val === 'object' && !(val instanceof Date)) {
       return JSON.stringify(val);
     }
     return formatToMySqlDateTime(val);
@@ -255,7 +271,7 @@ export async function dbBulkCreate(collection: string, records: Record<string, a
     for (const record of chunk) {
       for (const col of columns) {
         const val = record[col];
-        if (val !== null && typeof val === 'object') {
+        if (val !== null && typeof val === 'object' && !(val instanceof Date)) {
           values.push(JSON.stringify(val));
         } else {
           values.push(formatToMySqlDateTime(val));

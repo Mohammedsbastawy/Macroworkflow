@@ -7,8 +7,8 @@ import { AuthGuard } from "@/components/auth/AuthGuard";
 
 export interface ProfilePermissions {
   id: string;
-  code: "USER" | "ADMIN";
-  roleKey: "selfservice" | "admin";
+  code: "USER" | "ADMIN" | "AGENT";
+  roleKey: "selfservice" | "admin" | "agent";
   name: string;
   badgeColor: string;
   description: string;
@@ -41,6 +41,14 @@ const DEFAULT_PROFILES_META: Omit<ProfilePermissions, "modules" | "actions">[] =
     name: "Self-Service Employee (USER)",
     badgeColor: "draft",
     description: "Default profile for general staff. Can initiate requests and track own submissions.",
+  },
+  {
+    id: "prof-agent",
+    code: "AGENT",
+    roleKey: "agent",
+    name: "Agent (AGENT)",
+    badgeColor: "info",
+    description: "Support agent profile. Can view department tickets, assign tickets to team members, and process requests.",
   },
   {
     id: "prof-admin",

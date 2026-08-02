@@ -72,6 +72,20 @@ Directus REST API  --->  MySQL Database
 | comments | تعليقات على التذاكر |
 | alerts | تنبيهات النظام |
 
+### نظام الإشعارات (Notification System)
+| Collection | الوصف | المفتاح الأساسي |
+|-----------|--------|----------------|
+| notifications | إشعارات المستخدمين (صف لكل مستلم/حدث) | id (string, notif-{ts}) |
+
+- **الإرسال (producer):** لا يُرسل الإشعار إلا تلقائياً من محرك سير العمل (Server Actions / engine) — لا يكتب المستخدمون مباشرة.
+- **الاستهداف (targeting):** يُحل إلى مستخدمين محددين `user-*` وقت الكتابة عبر `src/lib/notifications/targeting.ts` (راوتر/مصفوفة توجيه لكل حدث).
+- **نقاط الحقن:** `submitRequest` (طلب جديد + طلب موافقة للمعتمد الأول)، `processApprovalAction` (موافقة/رفض/إرجاع/RFI + طلب موافقة للمعتمد التالي)، `assignTicketUserAction` (إسناد)، `addComment` (تعليق/ملاحظة داخلية).
+- **حدث `approval_requested`:** يُرسل للمعتمد الحالي عند توجيه خطوة موافقة إليه (أول معتمد عند التقديم، والمعتمد التالي عند التفويض للأمام).
+- **القواعد:** تجاهل النفس (self-suppression)؛ فلتر خصوصية التذكرة `canUserAccessTicket`؛ فان-أوت (صف لكل مستلم)؛ أحداث SLA/OLA تُرسل فقط لمن لديهم صلاحية.
+- **Server Actions:** `src/app/actions/notificationActions.ts` (جلب، عدد غير المقروء، تعليم كمقروء، أرشفة).
+- **الواجهة:** `src/components/notifications/NotificationBell.tsx` (جرس + لوحة منسدلة في الـ Topbar).
+- **تحديث لايف (Push عبر SSE):** `src/lib/notifications/realtime.ts` (hub في الذاكرة مرتبط بـ globalThis) + Route `src/app/api/notifications/stream` يبثّ حدث `refresh`. بعد إدراج إشعار في `notifier.ts` يُبثّ للمستلم مباشرة، و`NotificationBell` يستمع عبر `EventSource` (مع poll احتياطي 30 ثانية). ملاحظة: hub في الذاكرة يصلح للتشغيل المحلي/أحادي العملية — للإنتاج متعدد العمليات يُستبدل بـ Redis pub/sub.
+
 ---
 
 ## هيكل الملفات
@@ -99,6 +113,13 @@ workflow-engine/
 │   │       ├── workflowCore.ts        <- Business Logic للـ Workflow Engine
 │   │       ├── store.ts               <- TypeScript interfaces + normalize functions
 │   │       └── iamStore.ts            <- TypeScript interfaces ONLY (لا بيانات مبرمجة)
+│   ├── lib/
+│   │   └── notifications/
+│   │       ├── types.ts               <- Interfaces + normalize لسجل الإشعار
+│   │       ├── targeting.ts           <- مصفوفة التوجيه (من يتلقى الإشعار)
+│   │       └── notifier.ts            <- الإرسال والفان-أوت عبر dbCreate
+│   └── app/actions/notificationActions.ts <- Server Actions للإشعارات
+│   └── components/notifications/NotificationBell.tsx <- جرس ولوحة الإشعارات
 │   └── types/
 │       └── workflow.ts                <- TypeScript types للنظام
 ├── database/
@@ -153,7 +174,7 @@ directusDelete(collection, id)
 
 ### system_users (في Directus):
 - **id format:** user-{name} مثل user-ahmed, user-mona
-- **roles:** admin | approver | standard
+- **roles:** admin | agent | selfservice
 - **direct_manager_id:** يشير لـ id مستخدم آخر
 
 ### departments (في Directus):

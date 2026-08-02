@@ -18,8 +18,10 @@ import {
   dbDelete,
 } from './store';
 import { WorkflowStep, WorkflowFormField, WorkflowRequest, ApprovalLogEntry } from '@/types/workflow';
-import { continueGraphWorkflow, startGraphWorkflow } from './workflowRuntime';
+import { NotificationEventType } from '@/lib/notifications/types';
+import { continueGraphWorkflow, startGraphWorkflow, resolveAssignee } from './workflowRuntime';
 import { SYSTEM_USERS, BUSINESS_GROUPS } from './iamStore';
+import { notify } from '@/lib/notifications/notifier';
 
 // ============================================================
 //  Workflow Template CRUD
@@ -247,19 +249,8 @@ export function canUserAccessTicket(
 
   // 3.5. Match Assigned Group Membership
   const ticketGroup = (ticket.assigned_group || '').toLowerCase();
-  if (ticketGroup) {
-    const belongsToAssignedGroup = BUSINESS_GROUPS.some(bg => {
-      const isMatch = bg.id.toLowerCase() === ticketGroup ||
-                      bg.name.toLowerCase() === ticketGroup ||
-                      (bg.code || '').toLowerCase() === ticketGroup;
-      if (!isMatch) return false;
-      const members = bg.member_user_ids || (bg as any).member_user_ids_json || [];
-      return members.some((m: any) => {
-        const cleanM = String(m).toLowerCase();
-        return cleanM === userId || cleanM === userEmail || cleanM === userName;
-      });
-    });
-    if (belongsToAssignedGroup) return true;
+  if (ticketGroup && userInBusinessGroup(user, ticketGroup)) {
+    return true;
   }
 
   // 4. Observer / Watcher
@@ -272,7 +263,58 @@ export function canUserAccessTicket(
     return true;
   }
 
+  // 5. Workflow Target Audience gate (Target Business Groups / Target Departments)
+  // A non-involved user may only view the ticket if the workflow is restricted to
+  // a Target Business Group / Target Department that the user belongs to.
+  const targetGroups = ticket.target_group_ids || [];
+  const targetDepts = ticket.target_department_ids || [];
+  if (targetGroups.length === 0 && targetDepts.length === 0) {
+    return false; // global (unrestricted) workflow — non-involved users denied
+  }
+  if (userInAnyTargetAudience(user, targetGroups, targetDepts)) {
+    return true;
+  }
+
   // Access Denied!
+  return false;
+}
+
+/** True if the user is a member of the given business group (matching id/name/code). */
+function userInBusinessGroup(
+  user: { id?: string; name?: string; role?: string; email?: string; department_id?: string; department?: string },
+  groupIdOrName: string
+): boolean {
+  const userId = (user.id || '').toLowerCase();
+  const userEmail = (user.email || '').toLowerCase();
+  const userName = (user.name || '').toLowerCase();
+  const g = String(groupIdOrName || '').toLowerCase();
+  if (!g) return false;
+  return BUSINESS_GROUPS.some(bg => {
+    const isMatch = bg.id.toLowerCase() === g ||
+                    bg.name.toLowerCase() === g ||
+                    (bg.code || '').toLowerCase() === g;
+    if (!isMatch) return false;
+    const members = bg.member_user_ids || (bg as any).member_user_ids_json || [];
+    return members.some((m: any) => {
+      const cleanM = String(m).toLowerCase();
+      return cleanM === userId || cleanM === userEmail || cleanM === userName;
+    });
+  });
+}
+
+/** True if the user belongs to at least one target group or target department. */
+function userInAnyTargetAudience(
+  user: { id?: string; name?: string; role?: string; email?: string; department_id?: string; department?: string },
+  targetGroups: string[],
+  targetDepts: string[]
+): boolean {
+  if (targetGroups && targetGroups.length > 0) {
+    if (targetGroups.some((g) => userInBusinessGroup(user, g))) return true;
+  }
+  if (targetDepts && targetDepts.length > 0) {
+    const userDept = String((user as any).department_id || (user as any).department || '').toLowerCase();
+    if (userDept && targetDepts.some((d) => String(d).toLowerCase() === userDept)) return true;
+  }
   return false;
 }
 
@@ -377,6 +419,28 @@ export async function addObserversToTicket(ticketId: string, observerIdentifiers
  * Submit a new request (ticket) — creates ticket + EAV field values + audit log.
  * Automatically adds assigned Approvers to observer_id so they become watchers!
  */
+export function parseDurationToMs(durationStr: string | undefined | null, fallbackHours: number): number {
+  if (!durationStr) return fallbackHours * 60 * 60 * 1000;
+  const match = durationStr.match(/(\d+(?:\.\d+)?)\s*(minute|min|hour|hr|day|d|s)/i);
+  if (!match) {
+    const num = parseFloat(durationStr);
+    if (!isNaN(num)) return num * 60 * 60 * 1000;
+    return fallbackHours * 60 * 60 * 1000;
+  }
+  const value = parseFloat(match[1]);
+  const unit = match[2].toLowerCase();
+  if (unit.startsWith('min')) {
+    return value * 60 * 1000;
+  } else if (unit.startsWith('hour') || unit.startsWith('hr')) {
+    return value * 60 * 60 * 1000;
+  } else if (unit.startsWith('day') || unit.startsWith('d')) {
+    return value * 24 * 60 * 60 * 1000;
+  } else if (unit.startsWith('sec') || unit.startsWith('s')) {
+    return value * 1000;
+  }
+  return fallbackHours * 60 * 60 * 1000;
+}
+
 export async function submitRequest(params: {
   workflowSlug: string;
   title: string;
@@ -394,12 +458,8 @@ export async function submitRequest(params: {
   const reqNumber = `REQ-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   const firstStep = wf.steps.find((s) => s.step_order === 1) || wf.steps[0];
   const firstNodeId = firstStep?.react_flow_node_id || 'node-step-1';
-  const olaHours = firstStep?.ola_hours || 4;
-  const olaDeadline = new Date(Date.now() + olaHours * 60 * 60 * 1000).toISOString();
-  const slaDeadline = new Date(Date.now() + (wf.sla_total_hours || 48) * 60 * 60 * 1000).toISOString();
 
   const requester = params.requesterId || 'user-admin';
-  const firstAssignee = firstStep?.assignee_value || 'Department Manager';
 
   // 1.5 Fetch requester details to support dynamic defaults
   const { fetchSystemUsersAction } = await import('@/app/actions/workflowActions');
@@ -412,8 +472,29 @@ export async function submitRequest(params: {
   const requesterName = reqUserObj?.name || params.requesterName || params.requesterId || 'System User';
   const requesterDept = reqUserObj?.department_id || 'IT Department';
 
+  // Resolve the first assignee dynamically based on assignee_type
+  const firstAssigneeRaw = firstStep?.assignee_value || 'Department Manager';
+  const firstAssignee = resolveAssignee(firstAssigneeRaw, {
+    requester_id: requester,
+    requester_name: requesterName,
+    department_id: requesterDept,
+  }) || firstAssigneeRaw;
+
   // Resolve defaults from workflow config
   const panelCfg = (wf.visibility_rules as any)?.ticket_info_panel_config || (wf as any).visibility_rules_json?.ticket_info_panel_config || {};
+  
+  const nowMs = Date.now();
+  const slaTtoMs = parseDurationToMs(panelCfg.defaultSlaTto, 1);
+  const slaTtrMs = parseDurationToMs(panelCfg.defaultSlaTtr, 8);
+  const slaTtoDeadline = new Date(nowMs + slaTtoMs).toISOString();
+  const slaTtrDeadline = new Date(nowMs + slaTtrMs).toISOString();
+
+  const firstOlaHours = firstStep?.ola_hours ?? 4;
+  const firstOlaMinutes = firstStep?.ola_minutes ?? 0;
+  const firstOlaMs = (firstOlaHours * 60 + firstOlaMinutes) * 60 * 1000;
+  const olaDeadline = new Date(nowMs + firstOlaMs).toISOString();
+  const slaDeadline = slaTtrDeadline;
+
   const cleanVal = (val: string) => {
     if (!val || val.includes("None")) return "";
     return val;
@@ -459,10 +540,15 @@ export async function submitRequest(params: {
     current_assignees_json: [firstAssignee],
     assigned_group: resolvedGroup || '',
     assigned_user: defaultUser || '',
+    // Workflow Target Audience (Target Business Groups / Target Departments) — gates ticket visibility
+    target_group_ids_json: (wf.visibility_rules as any)?.group_ids || (wf as any).visibility_rules_json?.group_ids || [],
+    target_department_ids_json: (wf.visibility_rules as any)?.department_ids || (wf as any).visibility_rules_json?.department_ids || [],
     location_id: resolvedLocation || '',
     unit: resolvedUnit || '',
     submitted_at: new Date().toISOString(),
     sla_deadline: slaDeadline,
+    sla_tto_deadline: slaTtoDeadline,
+    sla_ttr_deadline: slaTtrDeadline,
     ola_deadline: olaDeadline,
     ola_accumulated_pause_ms: 0,
     date_created: new Date().toISOString(),
@@ -510,6 +596,29 @@ export async function submitRequest(params: {
 
   const createdLog = await dbCreate('approval_log', logPayload);
 
+  // Create OLA started log for Activity Timeline
+  const firstOlaStr = firstOlaHours > 0 ? `${Math.round(firstOlaHours)}h ${firstOlaMinutes > 0 ? `${firstOlaMinutes}m` : ''}` : `${firstOlaMinutes}m`;
+  await dbCreate('approval_log', {
+    id: `log_ola_start_${Date.now()}`,
+    ticket_id: createdTicket.id || ticketId,
+    actor_id: 'System',
+    actor_name: 'OLA Tracker',
+    action: 'ola_started',
+    comments: `[OLA Tracker]: Active Step OLA for "${firstStep?.name || 'First Step'}" started. Target: ${firstOlaStr}. Deadline is ${new Date(olaDeadline).toLocaleString()}.`,
+    decision_at: new Date().toISOString(),
+  });
+
+  // Create SLA started log for Activity Timeline
+  await dbCreate('approval_log', {
+    id: `log_sla_start_${Date.now()}`,
+    ticket_id: createdTicket.id || ticketId,
+    actor_id: 'System',
+    actor_name: 'SLA Tracker',
+    action: 'sla_started',
+    comments: `[SLA Tracker]: SLA timers initiated. TTO Target: ${panelCfg.defaultSlaTto || '1 Hour'}, TTR Target: ${panelCfg.defaultSlaTtr || '8 Hours'}.`,
+    decision_at: new Date().toISOString(),
+  });
+
   // A visual workflow is a graph, not an ordered list. Traverse its trigger and
   // automatic nodes now, stopping only when an approval node needs a human.
   const runtime = await startGraphWorkflow(createdTicket, wf, finalEavMap);
@@ -531,6 +640,25 @@ export async function submitRequest(params: {
     // Non-fatal — observer persistence should not block ticket creation
     console.warn('[addObserversToTicket failed]', e);
   }
+
+  // Establish requesting user identity (requester is also the actor for submission)
+  const requesterIdForNotify = reqUserObj?.id || requester || 'user-admin';
+  const requesterNameForNotify = reqUserObj?.name || requesterName;
+
+  // ── Notification: request submitted (confirmation to requester + first assignee alert)
+  void notify({
+    eventType: 'request_submitted',
+    ticket: runtimeTicket,
+    ticketId: runtimeTicket.id || ticketId,
+    ticketNumber: runtimeTicket.ticket_number || reqNumber,
+    actorId: requesterIdForNotify,
+    actorName: requesterNameForNotify,
+    step: firstStep,
+    metadata: { workflowName: wf.name },
+  });
+
+  // ── Notification: approval requested from the first approver/assignee
+  await emitApprovalRequested(runtimeTicket, wf, requesterNameForNotify, firstStep);
 
   return {
     request: normalizeTicket(runtimeTicket),
@@ -665,7 +793,73 @@ export async function getRequestById(
   const logRows = await dbGet('approval_log', { ticket_id: { _eq: ticket.id } }, 'decision_at');
   const logs = logRows.map(normalizeApprovalLog);
 
-  return { request, workflow, values, logs };
+  // Check for SLA/OLA breaches and log them if they haven't been logged yet
+  const now = new Date();
+  const nowMs = now.getTime();
+  let updatedLogs = [...logs];
+
+  const isClosedOrSolved = ['solved', 'closed', 'approved', 'rejected'].includes(request.status);
+
+  if (!isClosedOrSolved) {
+    // 1. SLA TTO Breach check
+    if (request.sla_tto_deadline && nowMs > new Date(request.sla_tto_deadline).getTime() && !request.assigned_user) {
+      const alreadyLoggedTto = logs.some((l: any) => l.action === 'sla_breached' && l.comments?.includes('TTO'));
+      if (!alreadyLoggedTto) {
+        const breachLog = {
+          id: `log_tto_breach_${Date.now()}`,
+          ticket_id: ticket.id,
+          action: 'sla_breached',
+          actor_id: 'System',
+          actor_name: 'SLA Tracker',
+          comments: `[Breach Alert] SLA TTO (Takeover) target has breached! Deadline was ${new Date(request.sla_tto_deadline).toLocaleString()}.`,
+          decision_at: now.toISOString(),
+        };
+        const createdLog = await dbCreate('approval_log', breachLog);
+        updatedLogs.push(normalizeApprovalLog(createdLog));
+      }
+    }
+
+    // 2. SLA TTR Breach check
+    const ttrDeadline = request.sla_ttr_deadline || request.sla_deadline;
+    if (ttrDeadline && nowMs > new Date(ttrDeadline).getTime()) {
+      const alreadyLoggedTtr = logs.some((l: any) => l.action === 'sla_breached' && l.comments?.includes('TTR'));
+      if (!alreadyLoggedTtr) {
+        const breachLog = {
+          id: `log_ttr_breach_${Date.now()}`,
+          ticket_id: ticket.id,
+          action: 'sla_breached',
+          actor_id: 'System',
+          actor_name: 'SLA Tracker',
+          comments: `[Breach Alert] SLA TTR (Resolution) target has breached! Deadline was ${new Date(ttrDeadline).toLocaleString()}.`,
+          decision_at: now.toISOString(),
+        };
+        const createdLog = await dbCreate('approval_log', breachLog);
+        updatedLogs.push(normalizeApprovalLog(createdLog));
+      }
+    }
+
+    // 3. Active Step OLA Breach check
+    if (request.ola_deadline && nowMs > new Date(request.ola_deadline).getTime()) {
+      const currentStep = (request.workflow_version_snapshot || []).find((s: any) => s.react_flow_node_id === request.current_step_node_id);
+      const stepName = currentStep?.name || 'Active Step';
+      const alreadyLoggedOla = logs.some((l: any) => l.action === 'ola_breached' && l.comments?.includes(`"${stepName}"`));
+      if (!alreadyLoggedOla) {
+        const breachLog = {
+          id: `log_ola_breach_${Date.now()}`,
+          ticket_id: ticket.id,
+          action: 'ola_breached',
+          actor_id: 'System',
+          actor_name: 'OLA Tracker',
+          comments: `[Breach Alert] Active Step OLA for "${stepName}" has breached! Deadline was ${new Date(request.ola_deadline).toLocaleString()}.`,
+          decision_at: now.toISOString(),
+        };
+        const createdLog = await dbCreate('approval_log', breachLog);
+        updatedLogs.push(normalizeApprovalLog(createdLog));
+      }
+    }
+  }
+
+  return { request, workflow, values, logs: updatedLogs };
 }
 
 /**
@@ -674,7 +868,7 @@ export async function getRequestById(
 export async function processApprovalAction(params: {
   requestId: string;
   actorName: string;
-  action: 'approved' | 'rejected' | 'returned_for_revision' | 'rfi_sent';
+  action: 'approved' | 'rejected' | 'returned_for_revision' | 'rfi_sent' | 'cancelled';
   comments?: string;
 }): Promise<{ request: WorkflowRequest; log: ApprovalLogEntry }> {
   // 1. Find ticket in database
@@ -689,9 +883,9 @@ export async function processApprovalAction(params: {
 
   // Use the persisted canvas graph when available. Older workflows without a
   // graph continue through the legacy ordered-step engine below.
-  const graphWorkflow = await dbGetOne<any>('workflows', ticket.workflow_id);
-  if (graphWorkflow) {
-    const runtime = await continueGraphWorkflow(ticket, graphWorkflow, params.action);
+  const wf = await dbGetOne<any>('workflows', ticket.workflow_id);
+  if (wf) {
+    const runtime = await continueGraphWorkflow(ticket, wf, params.action);
     if (runtime.handled) {
       const log = await dbCreate('approval_log', {
         id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -704,6 +898,17 @@ export async function processApprovalAction(params: {
         comments: params.comments || `Action ${params.action} recorded.`,
         decision_at: new Date().toISOString(),
       });
+
+      const step = (wf.steps_json || []).find(
+        (s: any) => s.react_flow_node_id === runtime.ticket.current_step_node_id
+      );
+      await emitApprovalNotification(runtime.ticket, wf, params.action, params.actorName || 'Approver', step);
+
+      // If the request advanced to another approval step, alert the new approver.
+      if (params.action === 'approved') {
+        await emitApprovalRequested(runtime.ticket, wf, params.actorName || 'Approver', step);
+      }
+
       return { request: normalizeTicket(runtime.ticket), log: normalizeApprovalLog(log) };
     }
   }
@@ -736,8 +941,10 @@ export async function processApprovalAction(params: {
       nextOrder = nextStep.step_order;
       nextNodeId = nextStep.react_flow_node_id;
       newAssignees = [nextStep.assignee_value || 'Next Manager'];
-      const newOla = nextStep.ola_hours || 4;
-      olaDeadline = new Date(Date.now() + newOla * 60 * 60 * 1000).toISOString();
+      const newOlaHours = nextStep.ola_hours ?? 4;
+      const newOlaMinutes = nextStep.ola_minutes ?? 0;
+      const olaMs = (newOlaHours * 60 + newOlaMinutes) * 60 * 1000;
+      olaDeadline = new Date(Date.now() + olaMs).toISOString();
     } else {
       // Final approval!
       newStatus = 'approved';
@@ -770,19 +977,55 @@ export async function processApprovalAction(params: {
   const updatedTicket = await dbUpdate('tickets', ticket.id, ticketUpdate);
 
   // 3. Create approval log entry
+  const currentStep = steps[currentStepIdx];
+  const currentOlaHours = currentStep?.ola_hours ?? 4;
+  const currentOlaMinutes = currentStep?.ola_minutes ?? 0;
+  const stepStart = ticket.date_updated ? new Date(ticket.date_updated).getTime() : new Date(ticket.date_created).getTime();
+  const elapsedMs = Date.now() - stepStart;
+  const elapsedMins = Math.round(elapsedMs / 60000);
+  const elapsedStr = elapsedMins >= 60 ? `${Math.floor(elapsedMins / 60)}h ${elapsedMins % 60}m` : `${elapsedMins}m`;
+
+  let appendComments = `\n\n[OLA Tracker]: Step "${currentStep?.name || 'Approval Step'}" OLA completed. Time taken: ${elapsedStr}. Target was: ${currentOlaHours > 0 ? `${Math.round(currentOlaHours)}h` : ''} ${currentOlaMinutes > 0 ? `${currentOlaMinutes}m` : ''}.`;
+
+  if (newStatus === 'approved') {
+    const totalSlaStart = new Date(ticket.date_created).getTime();
+    const totalSlaElapsedMs = Date.now() - totalSlaStart;
+    const totalSlaElapsedMins = Math.round(totalSlaElapsedMs / 60000);
+    const totalSlaElapsedStr = totalSlaElapsedMins >= 60 ? `${Math.floor(totalSlaElapsedMins / 60)}h ${totalSlaElapsedMins % 60}m` : `${totalSlaElapsedMins}m`;
+    const slaTargetHours = wf.sla_total_hours || 48;
+    appendComments += `\n[SLA Tracker]: Ticket Resolution SLA completed. Time taken: ${totalSlaElapsedStr}. Target was: ${slaTargetHours}h.`;
+  }
+
   const logPayload = {
+    id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     ticket_id: ticket.id,
     step_node_id: nextNodeId,
     step_order_snapshot: nextOrder,
     actor_id: params.actorName || 'Approver',
     actor_name: params.actorName || 'Approver',
     action: params.action,
-    comments: params.comments || `Action ${params.action} recorded.`,
+    comments: (params.comments || `Action ${params.action} recorded.`) + appendComments,
     decision_at: new Date().toISOString(),
   };
 
   const createdLog = await dbCreate('approval_log', logPayload);
 
+  // Create OLA started log for next step
+  const nextStep = steps[currentStepIdx + 1];
+  if (nextStep) {
+    const nextOlaHours = nextStep.ola_hours ?? 4;
+    const nextOlaMinutes = nextStep.ola_minutes ?? 0;
+    const nextOlaStr = nextOlaHours > 0 ? `${Math.round(nextOlaHours)}h ${nextOlaMinutes > 0 ? `${nextOlaMinutes}m` : ''}` : `${nextOlaMinutes}m`;
+    await dbCreate('approval_log', {
+      id: `log_ola_next_start_${Date.now()}`,
+      ticket_id: ticket.id,
+      actor_id: 'System',
+      actor_name: 'OLA Tracker',
+      action: 'ola_started',
+      comments: `[OLA Tracker]: Active Step OLA for "${nextStep.name || 'Next Step'}" started. Target: ${nextOlaStr}. Deadline is ${new Date(olaDeadline).toLocaleString()}.`,
+      decision_at: new Date().toISOString(),
+    });
+  }
 
   // Persist actor and new assignees as observers for normalized queries
   try {
@@ -791,10 +1034,151 @@ export async function processApprovalAction(params: {
     console.warn('[addObserversToTicket after approval failed]', e);
   }
 
+  // ── Notification: approval decision (legacy ordered-step engine)
+  const currentStepForNotify = steps.find(
+    (s: any) => s.react_flow_node_id === ticket.current_step_node_id || s.step_order === ticket.current_step_order
+  );
+  await emitApprovalNotification(updatedTicket, wf, params.action, params.actorName || 'Approver', currentStepForNotify);
+
+  // If the request advanced to another approval step, alert the new approver.
+  if (params.action === 'approved') {
+    const nextStepForNotify = steps.find(
+      (s: any) => s.react_flow_node_id === updatedTicket.current_step_node_id || s.step_order === updatedTicket.current_step_order
+    );
+    await emitApprovalRequested(updatedTicket, wf, params.actorName || 'Approver', nextStepForNotify);
+  }
+
   return {
     request: normalizeTicket(updatedTicket),
     log: normalizeApprovalLog(createdLog),
   };
+}
+
+/**
+ * Emit an approval-driven notification from a resolved ticket + workflow.
+ * Maps engine action -> notification event type, then fans out to recipients.
+ */
+async function emitApprovalNotification(
+  ticket: any,
+  wf: any,
+  action: string,
+  actorName: string,
+  step?: any
+): Promise<void> {
+  let eventType: NotificationEventType | null = null;
+  switch (action) {
+    case 'approved': eventType = 'approved'; break;
+    case 'rejected': eventType = 'rejected'; break;
+    case 'returned_for_revision': eventType = 'returned_for_revision'; break;
+    case 'rfi_sent': eventType = 'rfi_sent'; break;
+    case 'delegated': eventType = 'delegated'; break;
+    case 'cancelled': return; // no dedicated consumer notification for cancellation
+    default: return;
+  }
+  if (!eventType) return;
+  await notify({
+    eventType,
+    ticket,
+    ticketId: ticket.id,
+    ticketNumber: ticket.ticket_number,
+    actorId: actorName,
+    actorName,
+    step,
+    metadata: { workflowName: wf?.name },
+  });
+}
+
+/**
+ * Emit an "approval requested" notification to the ticket's current approver(s).
+ * Targets whichever user(s) hold the active approval step (current_assignees_json).
+ */
+async function emitApprovalRequested(
+  ticket: any,
+  wf: any,
+  actorName: string,
+  step?: any
+): Promise<void> {
+  await notify({
+    eventType: 'approval_requested',
+    ticket,
+    ticketId: ticket.id,
+    ticketNumber: ticket.ticket_number,
+    actorId: actorName,
+    actorName,
+    step,
+    metadata: { workflowName: wf?.name },
+  });
+}
+
+/**
+ * Add a comment (public or internal note) to a ticket, persisted to the approval_log table.
+ * Supports optional file attachments (image/file) stored via the files API.
+ */
+export async function addComment(params: {
+  ticketId: string;
+  actorId: string;
+  actorName: string;
+  content: string;
+  isInternal: boolean;
+  attachments?: Array<{ fileId: string; fileName: string; mimeType: string; size: number }>;
+  skipNotification?: boolean;
+}): Promise<ApprovalLogEntry> {
+  // Store attachment metadata as JSON embedded in the comments field
+  // (avoids needing new database columns)
+  let commentText = params.content || '';
+  if (params.attachments && params.attachments.length > 0) {
+    const attachmentJson = JSON.stringify({ _attachments: params.attachments });
+    commentText = commentText + '\n' + attachmentJson;
+  }
+  const logPayload: Record<string, any> = {
+    id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    ticket_id: params.ticketId,
+    step_node_id: null,
+    step_order_snapshot: null,
+    actor_id: params.actorId,
+    actor_name: params.actorName,
+    action: params.isInternal ? 'internal_note' : 'commented',
+    comments: commentText,
+    decision_at: new Date().toISOString(),
+  };
+  const created = await dbCreate('approval_log', logPayload);
+
+  // ── Notification: public comment / internal note
+  if (params.skipNotification) {
+    return normalizeApprovalLog(created);
+  }
+  if (!params.isInternal) {
+    // enrichment: load ticket row for targeting
+    try {
+      const ticketRow = await dbGetOne<any>('tickets', params.ticketId);
+      void notify({
+        eventType: 'comment_added',
+        ticket: ticketRow || { id: params.ticketId, requester_id: params.actorId },
+        ticketId: params.ticketId,
+        ticketNumber: ticketRow?.ticket_number,
+        actorId: params.actorId,
+        actorName: params.actorName,
+      });
+    } catch (e) {
+      console.warn('[comment notification failed]', e);
+    }
+  } else {
+    try {
+      const ticketRow = await dbGetOne<any>('tickets', params.ticketId);
+      void notify({
+        eventType: 'internal_note_added',
+        ticket: ticketRow || { id: params.ticketId, requester_id: params.actorId },
+        ticketId: params.ticketId,
+        ticketNumber: ticketRow?.ticket_number,
+        actorId: params.actorId,
+        actorName: params.actorName,
+      });
+    } catch (e) {
+      console.warn('[internal note notification failed]', e);
+    }
+  }
+
+  return normalizeApprovalLog(created);
 }
 
 

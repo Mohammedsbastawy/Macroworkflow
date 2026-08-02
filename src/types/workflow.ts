@@ -138,6 +138,8 @@ export interface WorkflowRequest {
   assigned_group?: string;
   assigned_user?: string;
   requester_name?: string;
+  target_group_ids?: string[];
+  target_department_ids?: string[];
 }
 
 export interface ApprovalLogEntry {
@@ -154,6 +156,7 @@ export interface ApprovalLogEntry {
     | 'delegated' 
     | 'escalated' 
     | 'commented' 
+    | 'internal_note'
     | 'cancelled' 
     | 'rfi_sent' 
     | 'rfi_answered' 
@@ -168,6 +171,7 @@ export interface ApprovalLogEntry {
   decision_at: string;
   ola_elapsed_ms?: number;
   date_created?: string;
+  is_internal?: boolean;
   metadata_json?: Record<string, unknown>;
 }
 

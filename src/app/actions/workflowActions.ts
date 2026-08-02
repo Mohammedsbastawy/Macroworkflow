@@ -105,6 +105,9 @@ export async function createWorkflowFormAction(formData: {
   // Save directly to database via workflowCore
   const template = await saveWorkflowTemplate(payload as any);
 
+  // Invalidate the in-memory catalog cache so the next fetch returns the fresh record
+  await invalidateActionCache();
+
   revalidatePath('/workflows');
   revalidatePath('/requests/new');
   return { success: true, template };
@@ -140,7 +143,7 @@ export async function submitWorkflowRequestAction(payload: {
 export async function submitApprovalDecisionAction(payload: {
   requestId: string;
   actorName: string;
-  action: 'approved' | 'rejected' | 'returned_for_revision';
+  action: 'approved' | 'rejected' | 'returned_for_revision' | 'cancelled';
   comments?: string;
 }) {
   const updatedRequest = await processApprovalAction(payload);
@@ -150,6 +153,26 @@ export async function submitApprovalDecisionAction(payload: {
   revalidatePath('/my-requests');
   revalidatePath('/');
   return { success: true, request: updatedRequest.request };
+}
+
+/**
+ * Add a comment (public or internal note) to a ticket, persisted to the approval_log table.
+ * Supports optional file attachments.
+ */
+export async function addCommentAction(params: {
+  ticketId: string;
+  actorId: string;
+  actorName: string;
+  content: string;
+  isInternal: boolean;
+  attachments?: Array<{ fileId: string; fileName: string; mimeType: string; size: number }>;
+  skipNotification?: boolean;
+}) {
+  const { addComment } = await import('@/lib/engine/workflowCore');
+  const log = await addComment(params);
+  revalidatePath(`/requests/${params.ticketId}`);
+  revalidatePath('/requests');
+  return { success: true, log };
 }
 
 /**
@@ -187,14 +210,24 @@ export async function fetchAuthorizedCatalogWorkflowsAction(userId?: string) {
 
 /**
  * Fetch All Requests / Tickets — directly from database
+ * When a userId is provided, results are filtered to tickets the user can access
+ * (requester, assigned group/technician, assignee, or observer).
  */
-export async function fetchAllRequestsAction() {
+export async function fetchAllRequestsAction(userId?: string) {
+  let currentUser: any = undefined;
+  if (userId) {
+    const users = await fetchSystemUsersAction();
+    currentUser = users.find((u: any) => u.id === userId) || null;
+    if (!currentUser) currentUser = undefined;
+  }
+
   const now = Date.now();
-  if (cachedRequests && now - cachedRequests.timestamp < CACHE_TTL_MS) {
+  if (!currentUser && cachedRequests && now - cachedRequests.timestamp < CACHE_TTL_MS) {
     return cachedRequests.data;
   }
-  const data = await getRequests();
-  cachedRequests = { data, timestamp: now };
+
+  const data = await getRequests(undefined, currentUser);
+  if (!currentUser) cachedRequests = { data, timestamp: now };
   return data;
 }
 
@@ -858,6 +891,17 @@ export async function deleteTravelZoneAction(id: string) {
   return { success: true };
 }
 
+function normalizeRole(role: string): string {
+  // Strip 'role-' prefix if present (e.g., 'role-agent' -> 'agent', 'role-selfservice' -> 'selfservice')
+  const cleaned = role.replace(/^role-/, '');
+  // Map legacy database roles to the expected role names
+  const roleMap: Record<string, string> = {
+    'standard': 'selfservice',
+    'approver': 'agent',
+  };
+  return roleMap[cleaned] || cleaned;
+}
+
 export async function fetchSystemUsersAction() {
   const now = Date.now();
   if (cachedUsers && now - cachedUsers.timestamp < CACHE_TTL_MS) {
@@ -867,10 +911,24 @@ export async function fetchSystemUsersAction() {
   try {
     const rows = await dbGet('system_users');
     if (rows && rows.length > 0) {
-      const data = rows.map((r: any) => ({
-        ...r,
-        group_ids: r.group_ids_json || [],
-      }));
+      const data = rows.map((r: any) => {
+        const rawRole = r.role || 'selfservice';
+        const role = normalizeRole(rawRole);
+        let roles: string[];
+        if (r.roles_json) {
+          roles = r.roles_json.map(normalizeRole);
+        } else if (Array.isArray(r.roles)) {
+          roles = r.roles.map(normalizeRole);
+        } else {
+          roles = [role];
+        }
+        return {
+          ...r,
+          role,
+          roles,
+          group_ids: r.group_ids_json || [],
+        };
+      });
       cachedUsers = { data, timestamp: now };
       return data;
     }
@@ -888,6 +946,7 @@ export async function saveSystemUserAction(payload: {
   department_id: string;
   group_ids: string[];
   role: 'admin' | 'selfservice' | string;
+  roles?: ('admin' | 'selfservice' | 'agent')[];
   avatar_initials: string;
   job_title?: string;
   direct_manager_id?: string;
@@ -900,14 +959,35 @@ export async function saveSystemUserAction(payload: {
   delegation_end_date?: string;
   delegation_notes?: string;
   can_assign_group_tickets?: boolean | number;
+  username?: string;
+  password?: string;
+  auth_type?: 'password' | 'microsoft' | 'both';
 }) {
   const { dbCreate, dbUpdate } = await import('@/lib/db/mysqlClient');
-  const record = {
+  const role = payload.role || 'selfservice';
+  const roles = payload.roles || [role];
+  const record: Record<string, any> = {
     ...payload,
+    role,
+    roles_json: roles,
     group_ids_json: payload.group_ids,
   };
-  delete (record as any).group_ids;
-  
+  delete record.group_ids;
+  delete record.roles;
+
+  // Local credentials
+  if (payload.username !== undefined) record.username = payload.username;
+  if (payload.auth_type) record.auth_type = payload.auth_type;
+  // Hash new/cleartext passwords (skip masked placeholders from the edit form).
+  if (payload.password && payload.password.trim() && !payload.password.includes('••')) {
+    const bcrypt = await import('bcryptjs');
+    record.password_hash = await bcrypt.hash(payload.password, 10);
+  }
+  if (payload.username !== undefined || payload.password) {
+    record.auth_type = payload.auth_type || 'password';
+  }
+  delete record.password;
+
   try {
     if (payload.id) {
       await dbUpdate('system_users', payload.id, record);
@@ -922,6 +1002,7 @@ export async function saveSystemUserAction(payload: {
   }
   revalidatePath('/admin/users');
   revalidatePath('/');
+  invalidateActionCache();
   return { success: true };
 }
 
@@ -1248,6 +1329,24 @@ export async function updateTicketClassificationAction(
 
 export async function assignTicketUserAction(ticketId: string, assignedUser: string, actorName: string) {
   const now = new Date().toISOString();
+  
+  // Calculate SLA TTO takeover duration
+  const { dbGetOne } = await import('@/lib/db/mysqlClient');
+  const ticket = await dbGetOne('tickets', ticketId);
+  const previousAssignee = ticket?.assigned_user || '';
+  let slaTtoLog = '';
+  if (ticket) {
+    const ttoStart = new Date(ticket.date_created).getTime();
+    const ttoElapsedMs = Date.now() - ttoStart;
+    const ttoElapsedMins = Math.round(ttoElapsedMs / 60000);
+    const ttoElapsedStr = ttoElapsedMins >= 60 ? `${Math.floor(ttoElapsedMins / 60)}h ${ttoElapsedMins % 60}m` : `${ttoElapsedMins}m`;
+
+    const wf = await dbGetOne('workflows', ticket.workflow_id);
+    const panelCfg = wf?.visibility_rules_json?.ticket_info_panel_config || wf?.visibility_rules?.ticket_info_panel_config || {};
+    const ttoTargetStr = panelCfg.defaultSlaTto || '1 Hour';
+    slaTtoLog = `\n\n[SLA Tracker]: SLA TTO (Takeover) completed. Time taken: ${ttoElapsedStr}. Target was: ${ttoTargetStr}.`;
+  }
+
   await dbUpdate('tickets', ticketId, {
     assigned_user: assignedUser,
     date_updated: now,
@@ -1259,14 +1358,41 @@ export async function assignTicketUserAction(ticketId: string, assignedUser: str
     ticket_id: ticketId,
     action: 'commented',
     actor_name: actorName,
-    comments: `Ticket assigned to employee: ${assignedUser} by ${actorName}.`,
+    comments: `Ticket assigned to employee: ${assignedUser} by ${actorName}.${slaTtoLog}`,
     decision_at: now,
   });
+
+  // ── Notification: assignment
+  const { notify } = await import('@/lib/notifications/notifier');
+  try {
+    // Notify the new assignee.
+    void notify({
+      eventType: 'assigned_to_you',
+      ticket: { ...(ticket || {}), id: ticketId, assigned_user: assignedUser },
+      ticketId,
+      ticketNumber: ticket?.ticket_number,
+      actorId: actorName,
+      actorName,
+      recipients: [assignedUser],
+    });
+    // If the ticket was reassigned from someone else, inform the previous assignee.
+    if (previousAssignee && previousAssignee !== assignedUser) {
+      void notify({
+        eventType: 'assignment_changed',
+        ticket: { ...(ticket || {}), id: ticketId },
+        ticketId,
+        ticketNumber: ticket?.ticket_number,
+        actorId: actorName,
+        actorName,
+        recipients: [previousAssignee],
+        metadata: { previousAssignees: [previousAssignee] as string[] },
+      });
+    }
+  } catch (e) {
+    console.warn('[assignment notification failed]', e);
+  }
 
   revalidatePath('/requests');
   revalidatePath(`/requests/${ticketId}`);
   return { success: true };
 }
-
-
-

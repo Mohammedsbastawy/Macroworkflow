@@ -23,6 +23,7 @@ CREATE TABLE `system_users` (
   `department_id` VARCHAR(255),
   `group_ids_json` JSON,
   `role` VARCHAR(255),
+  `roles_json` JSON,
   `avatar_initials` VARCHAR(255),
   `job_title` VARCHAR(255),
   `direct_manager_id` VARCHAR(255),

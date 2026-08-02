@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { SYSTEM_USERS, SystemUser, DEFAULT_ROLE_PERMISSIONS } from "@/lib/engine/iamStore";
 import { fetchRolePermissionsAction } from "@/app/actions/workflowActions";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { safeStorage } from "@/lib/safeStorage";
 
 interface NavItem {
   href: string;
@@ -64,7 +65,7 @@ export function Sidebar() {
   const [permissionsMap, setPermissionsMap] = useState<Record<string, any>>(DEFAULT_ROLE_PERMISSIONS);
 
   const loadSimulatedData = async () => {
-    const savedId = localStorage.getItem("simulated_user_id");
+    const savedId = safeStorage.getItem("simulated_user_id");
     if (savedId) {
       const found = SYSTEM_USERS.find((u) => u.id === savedId);
       if (found) setCurrentUser(found);
@@ -104,7 +105,7 @@ export function Sidebar() {
   }, [pathname]);
 
   const { lang } = useLanguage();
-  const currentRoleCode = currentUser.role;
+  const currentRoleCode = currentUser?.role || 'selfservice';
   const activeRoleModules = permissionsMap[currentRoleCode]?.modules || DEFAULT_ROLE_PERMISSIONS[currentRoleCode]?.modules || {};
 
   return (
@@ -170,11 +171,11 @@ export function Sidebar() {
       {/* User Profile Footer (with suppressHydrationWarning for dynamic simulated user) */}
       <div className="sidebar-footer" suppressHydrationWarning>
         <div className="sidebar-user" suppressHydrationWarning>
-          <div className="avatar a" suppressHydrationWarning>{currentUser.avatar_initials}</div>
+          <div className="avatar a" suppressHydrationWarning>{currentUser?.avatar_initials || '??'}</div>
           <div suppressHydrationWarning>
-            <div className="sidebar-user-name" suppressHydrationWarning>{currentUser.name}</div>
+            <div className="sidebar-user-name" suppressHydrationWarning>{currentUser?.name || 'Guest'}</div>
             <div className="sidebar-user-role" style={{ textTransform: "uppercase", fontSize: 10, color: "var(--color-primary)" }} suppressHydrationWarning>
-              {currentUser.role} · {currentUser.department_id.replace("dept-", "").toUpperCase()}
+              {(currentUser?.role || 'selfservice')} · {(currentUser?.department_id || 'dept-guest').replace("dept-", "").toUpperCase()}
             </div>
           </div>
         </div>

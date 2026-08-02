@@ -3,6 +3,7 @@ import { dbGet, dbUpdate, dbCreate } from '@/lib/db/mysqlClient';
 import { normalizeTicket, normalizeApprovalLog } from './store';
 import { SYSTEM_USERS, SystemUser } from './iamStore';
 import { WorkflowRequest, ApprovalLogEntry } from '@/types/workflow';
+import { notify } from '@/lib/notifications/notifier';
 
 export interface DocTypeDefinition {
   id: string;
@@ -69,12 +70,35 @@ export async function pauseTicketOlaClockForRfi(ticketId: string, actorName: str
     actor_id: actorName,
     actor_name: actorName,
     action: 'rfi_sent',
-    comments: `RFI Question: ${rfiQuestion} (OLA Timer Paused)`,
+    comments: `RFI Question: ${rfiQuestion}`,
     decision_at: now,
     hash_sha256: auditHash,
   };
 
   const log = await dbCreate('approval_log', logPayload);
+
+  // Log OLA clock paused separately for Activity Timeline
+  await dbCreate('approval_log', {
+    id: `log_ola_pause_${Date.now()}`,
+    ticket_id: ticket.id,
+    actor_id: 'System',
+    actor_name: 'OLA Tracker',
+    action: 'ola_paused',
+    comments: `[OLA Tracker]: OLA clock paused due to RFI (Request For Information).`,
+    decision_at: now,
+  });
+
+  // ── Notification: RFI sent → announce to everyone on the ticket
+  // (requester, tech group/assignee, CC'd observers).
+  void notify({
+    eventType: 'rfi_sent',
+    ticket: updatedTicket || ticket,
+    ticketId: ticket.id,
+    ticketNumber: ticket.ticket_number,
+    actorId: actorName,
+    actorName,
+    metadata: { rfiQuestion },
+  });
 
   return { ticket: normalizeTicket(updatedTicket), log: normalizeApprovalLog(log) };
 }
@@ -114,12 +138,34 @@ export async function resumeTicketOlaClockAfterRfi(ticketId: string, requesterNa
     actor_id: requesterName,
     actor_name: requesterName,
     action: 'rfi_answered',
-    comments: `RFI Answer: ${answerText} (OLA Timer Resumed)`,
+    comments: `RFI Answer: ${answerText}`,
     decision_at: now,
     hash_sha256: auditHash,
   };
 
   const log = await dbCreate('approval_log', logPayload);
+
+  // Log OLA clock resumed separately for Activity Timeline
+  await dbCreate('approval_log', {
+    id: `log_ola_resume_${Date.now()}`,
+    ticket_id: ticket.id,
+    actor_id: 'System',
+    actor_name: 'OLA Tracker',
+    action: 'ola_resumed',
+    comments: `[OLA Tracker]: OLA clock resumed.`,
+    decision_at: now,
+  });
+
+  // ── Notification: RFI answered → announce to everyone on the ticket.
+  void notify({
+    eventType: 'rfi_answered',
+    ticket: updatedTicket || ticket,
+    ticketId: ticket.id,
+    ticketNumber: ticket.ticket_number,
+    actorId: requesterName,
+    actorName: requesterName,
+    metadata: { answerText },
+  });
 
   return { ticket: normalizeTicket(updatedTicket), log: normalizeApprovalLog(log) };
 }

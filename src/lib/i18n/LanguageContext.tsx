@@ -1,7 +1,9 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { safeStorage } from "@/lib/safeStorage";
 
 export type Language = "en" | "ar";
+
 
 interface LanguageContextType {
   lang: Language;
@@ -57,7 +59,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Language>("en");
 
   useEffect(() => {
-    const saved = localStorage.getItem("system_lang") as Language;
+    const saved = safeStorage.getItem("system_lang") as Language;
     if (saved === "ar" || saved === "en") {
       setLangState(saved);
       document.documentElement.dir = saved === "ar" ? "rtl" : "ltr";
@@ -71,7 +73,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   const setLang = (newLang: Language) => {
     setLangState(newLang);
-    localStorage.setItem("system_lang", newLang);
+    safeStorage.setItem("system_lang", newLang);
     document.documentElement.dir = newLang === "ar" ? "rtl" : "ltr";
     document.documentElement.lang = newLang;
     window.dispatchEvent(new Event("system-language-changed"));

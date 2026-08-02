@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local uploads, scratch scripts and temporary files
+/uploads/
+/scratch/
+tmp_*
+

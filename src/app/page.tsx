@@ -7,6 +7,7 @@ import { SYSTEM_USERS, SystemUser } from "@/lib/engine/iamStore";
 import { SimplifiedPortal } from "@/components/portal/SimplifiedPortal";
 
 import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { safeStorage } from "@/lib/safeStorage";
 
 export default function HomeDashboardPage() {
   const [mounted, setMounted] = useState(false);
@@ -20,19 +21,21 @@ export default function HomeDashboardPage() {
     try {
       const { fetchSystemUsersAction } = await import("@/app/actions/workflowActions");
       const dbUsers = await fetchSystemUsersAction();
-      const savedId = localStorage.getItem("simulated_user_id");
+      console.log('[page.tsx] dbUsers:', dbUsers);
+      const savedId = safeStorage.getItem("simulated_user_id");
+      console.log('[page.tsx] savedId:', savedId);
+      let activeUser: any = null;
       if (savedId) {
         const found = dbUsers.find((u: any) => u.id === savedId) || dbUsers[0];
-        if (found) setCurrentUser(found as any);
+        console.log('[page.tsx] found user:', found);
+        if (found) activeUser = found;
       } else if (dbUsers.length > 0) {
-        setCurrentUser(dbUsers[0] as any);
+        console.log('[page.tsx] setting first user:', dbUsers[0]);
+        activeUser = dbUsers[0];
       }
-    } catch (e) {
-      console.error(e);
-    }
+      if (activeUser) setCurrentUser(activeUser as any);
 
-    try {
-      const res = await fetchAllRequestsAction();
+      const res = await fetchAllRequestsAction(activeUser?.id);
       setRequests(res?.requests || []);
     } catch (e) {
       console.error(e);
@@ -55,15 +58,49 @@ export default function HomeDashboardPage() {
     );
   }
 
-  // Self-service Employees get the Simplified Self-Service Portal View!
-  if (currentUser.role === "selfservice") {
-    return <SimplifiedPortal />;
-  }
+  // Debug logging
+  console.log('[page.tsx] currentUser:', currentUser);
+  console.log('[page.tsx] currentUser.role:', currentUser.role);
+  console.log('[page.tsx] currentUser.roles:', currentUser.roles);
+  console.log('[page.tsx] hasSelfServiceRole:', (currentUser.roles && currentUser.roles.includes("selfservice")) || currentUser.role === "selfservice");
+  console.log('[page.tsx] hasAgentRole:', (currentUser.roles && currentUser.roles.includes("agent")) || currentUser.role === "agent");
+
+    // Determine user roles from the roles array or single role field
+    const userRoles = new Set<string>([
+      ...(currentUser.roles || []),
+      ...(currentUser.role ? [currentUser.role] : []),
+    ]);
+
+    // Check if user has agent or admin role
+    const hasAgentRole = userRoles.has("agent");
+    const hasAdminRole = userRoles.has("admin");
+    const hasSelfServiceRole = userRoles.has("selfservice");
+
+    // Simplified Dashboard is ONLY for users with pure selfservice role (no agent/admin)
+    // Agent → Enterprise Dashboard
+    // Admin → Enterprise Dashboard
+    // Self Service + Agent/Admin → Enterprise Dashboard
+    if (hasSelfServiceRole && !hasAgentRole && !hasAdminRole) {
+      console.log('[page.tsx] Returning SimplifiedPortal (pure selfservice)');
+      return <SimplifiedPortal />;
+    }
+  console.log('[page.tsx] Returning Enterprise Dashboard');
 
   // Admin users get the Full Enterprise Analytics Dashboard
   const pendingApprovals = requests.filter((r) => r.status === "pending" || r.status === "pending_info");
   const approvedTotal = requests.filter((r) => r.status === "approved" || r.status === "solved").length;
   const totalCount = requests.length;
+
+  // SLA Compliance Rate — computed from closed tickets with an SLA deadline
+  const slaEligible = requests.filter(
+    (r) => (r.status === "approved" || r.status === "solved" || r.status === "rejected") && r.sla_deadline
+  );
+  const slaMet = slaEligible.filter((r) => {
+    const deadline = new Date(r.sla_deadline).getTime();
+    const done = r.completed_at ? new Date(r.completed_at).getTime() : Date.now();
+    return !isNaN(deadline) && !isNaN(done) && done <= deadline;
+  });
+  const slaRate = slaEligible.length > 0 ? Math.round((slaMet.length / slaEligible.length) * 1000) / 10 : null;
 
   return (
     <>
@@ -114,7 +151,7 @@ export default function HomeDashboardPage() {
         <div className="kpi-card">
           <div className="kpi-icon purple">📊</div>
           <div className="kpi-body">
-            <div className="kpi-value">98.4%</div>
+            <div className="kpi-value">{slaRate === null ? "N/A" : `${slaRate}%`}</div>
             <div className="kpi-label">SLA Compliance Rate</div>
           </div>
         </div>

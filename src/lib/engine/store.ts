@@ -123,6 +123,9 @@ export function normalizeTicket(raw: any): WorkflowRequest {
     assigned_group: raw.assigned_group || '',
     assigned_user: raw.assigned_user || '',
     solved_date: raw.solved_date || raw.solved_at || null,
+    // Workflow Target Audience (Target Business Groups / Target Departments)
+    target_group_ids: raw.target_group_ids_json || [],
+    target_department_ids: raw.target_department_ids_json || [],
   };
 }
 
@@ -130,6 +133,24 @@ export function normalizeTicket(raw: any): WorkflowRequest {
  * Normalize a database approval_log row into our app's ApprovalLogEntry shape.
  */
 export function normalizeApprovalLog(raw: any): ApprovalLogEntry {
+  let comments = raw.comments || '';
+  let metadata: Record<string, any> | undefined = undefined;
+  // Check if the last line of comments is a hidden JSON attachment payload
+  if (comments) {
+    const lines = comments.split('\n');
+    const lastLine = lines[lines.length - 1].trim();
+    if (lastLine.startsWith('{"_attachments":') || lastLine.startsWith('{"attachments":')) {
+      try {
+        const parsed = JSON.parse(lastLine);
+        if (parsed._attachments || parsed.attachments) {
+          metadata = { attachments: parsed._attachments || parsed.attachments };
+          comments = lines.slice(0, -1).join('\n');
+        }
+      } catch (e) {
+        // Not a valid JSON payload, treat as normal text
+      }
+    }
+  }
   return {
     id: raw.id,
     request_id: raw.ticket_id || raw.request_id || '',
@@ -137,10 +158,11 @@ export function normalizeApprovalLog(raw: any): ApprovalLogEntry {
     step_order_snapshot: raw.step_order_snapshot,
     actor_id: raw.actor_id || raw.actor_name || '',
     action: raw.action || 'submitted',
-    comments: raw.comments,
+    comments: comments,
     decision_at: raw.decision_at || new Date().toISOString(),
     ola_elapsed_ms: raw.ola_elapsed_ms,
-    metadata_json: raw.metadata_json,
+    is_internal: raw.is_internal === true || raw.is_internal === 1 || raw.action === 'internal_note',
+    metadata_json: metadata || raw.metadata_json,
   };
 }
 

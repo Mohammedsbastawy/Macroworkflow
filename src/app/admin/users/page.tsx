@@ -30,8 +30,11 @@ export default function UsersIamPage() {
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
+  const [userUsername, setUserUsername] = useState("");
+  const [userPassword, setUserPassword] = useState("");
+  const [userAuthType, setUserAuthType] = useState<string>("password");
   const [userDept, setUserDept] = useState("dept-it");
-  const [userRole, setUserRole] = useState<"admin" | "selfservice">("selfservice");
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(["selfservice"]);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
 
   // Add Dept Modal State
@@ -85,15 +88,23 @@ export default function UsersIamPage() {
       email: userEmail,
       department_id: userDept,
       group_ids: selectedGroupIds,
-      role: userRole,
+      role: selectedRoles[0] || "selfservice",
+      roles: selectedRoles as ('admin' | 'selfservice' | 'agent')[],
       avatar_initials: initials || "US",
+      username: userAuthType === "password" || userAuthType === "both" ? userUsername.trim() : undefined,
+      password: userAuthType === "password" || userAuthType === "both" ? userPassword : undefined,
+      auth_type: userAuthType as "password" | "microsoft" | "both",
     };
 
     await saveSystemUserAction(newUserPayload);
     setShowAddUserModal(false);
     setUserName("");
     setUserEmail("");
+    setUserUsername("");
+    setUserPassword("");
+    setUserAuthType("password");
     setSelectedGroupIds([]);
+    setSelectedRoles(["selfservice"]);
     await loadData();
   };
 
@@ -251,9 +262,19 @@ export default function UsersIamPage() {
                         </div>
                       </td>
                       <td>
-                        <span className={`badge ${u.role === "admin" ? "urgent" : "draft"}`}>
-                          {u.role.toUpperCase()}
-                        </span>
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {u.roles && u.roles.length > 0 ? (
+                            u.roles.map((role) => (
+                              <span key={role} className={`badge ${role === "admin" ? "urgent" : role === "agent" ? "info" : "draft"}`} style={{ fontSize: 10 }}>
+                                {role.toUpperCase()}
+                              </span>
+                            ))
+                          ) : (
+                            <span className={`badge ${u.role === "admin" ? "urgent" : u.role === "agent" ? "info" : "draft"}`}>
+                              {u.role.toUpperCase()}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td>
                         <Link href={`/admin/users/${u.id}`}>
@@ -361,6 +382,31 @@ export default function UsersIamPage() {
                   <label className="form-label">Email Address *</label>
                   <input type="email" className="form-control" value={userEmail} onChange={(e) => setUserEmail(e.target.value)} required />
                 </div>
+                <div className="form-group">
+                  <label className="form-label">Sign-in Method *</label>
+                  <select className="form-control" value={userAuthType} onChange={(e) => setUserAuthType(e.target.value)}>
+                    <option value="password">Username / Password</option>
+                    <option value="microsoft">Microsoft 365 (SSO)</option>
+                    <option value="both">Both password & Microsoft 365</option>
+                  </select>
+                </div>
+                {(userAuthType === "password" || userAuthType === "both") && (
+                  <>
+                    <div className="form-group">
+                      <label className="form-label">Username *</label>
+                      <input className="form-control" value={userUsername} onChange={(e) => setUserUsername(e.target.value)} placeholder="e.g. ahmed.mohamed" />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Password *</label>
+                      <input type="password" className="form-control" value={userPassword} onChange={(e) => setUserPassword(e.target.value)} placeholder="Temporary / initial password" />
+                    </div>
+                  </>
+                )}
+                {userAuthType === "microsoft" && (
+                  <div style={{ fontSize: 12, color: "var(--color-text-muted)", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, padding: "8px 12px" }}>
+                    ☁ This employee will sign in with their Microsoft 365 work email. Ensure the email above matches their corporate email exactly.
+                  </div>
+                )}
                 <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">Department</label>
@@ -371,11 +417,42 @@ export default function UsersIamPage() {
                     </select>
                   </div>
                   <div className="form-group">
-                    <label className="form-label">IAM Role</label>
-                    <select className="form-control" value={userRole} onChange={(e) => setUserRole(e.target.value as any)}>
-                      <option value="selfservice">Self-Service Employee</option>
-                      <option value="admin">System Admin</option>
-                    </select>
+                    <label className="form-label" style={{ fontWeight: 700 }}>IAM Roles (اختر الأدوار):</label>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, background: "var(--color-bg)", padding: 10, borderRadius: "var(--radius-md)" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedRoles.includes("selfservice")}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedRoles([...selectedRoles.filter(r => r !== "selfservice"), "selfservice"]);
+                            else setSelectedRoles(selectedRoles.filter(r => r !== "selfservice"));
+                          }}
+                        />
+                        👤 Self-Service Employee
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedRoles.includes("agent")}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedRoles([...selectedRoles.filter(r => r !== "agent"), "agent"]);
+                            else setSelectedRoles(selectedRoles.filter(r => r !== "agent"));
+                          }}
+                        />
+                        🛡️ Agent
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedRoles.includes("admin")}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedRoles([...selectedRoles.filter(r => r !== "admin"), "admin"]);
+                            else setSelectedRoles(selectedRoles.filter(r => r !== "admin"));
+                          }}
+                        />
+                        👑 System Admin
+                      </label>
+                    </div>
                   </div>
                 </div>
 

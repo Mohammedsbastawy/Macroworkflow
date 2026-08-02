@@ -4,7 +4,7 @@ import { SYSTEM_USERS, DEPARTMENTS } from './iamStore';
 type Node = { id: string; type?: string; data?: Record<string, any> };
 type Edge = { source: string; target: string; sourceHandle?: string | null };
 
-function resolveAssignee(expression: string, ticket: any): string {
+export function resolveAssignee(expression: string, ticket: any): string {
   const cleanExpr = String(expression || '').trim();
   const lower = cleanExpr.toLowerCase();
   
@@ -93,7 +93,7 @@ async function valuesFor(ticketId: string) {
 async function audit(ticketId: string, node: Node, message: string) {
   await dbCreate('approval_log', {
     id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    ticket_id: ticketId, step_node_id: node.id, action: 'commented', actor_id: 'workflow-engine', actor_name: 'Workflow Engine', comments: message, decision_at: new Date().toISOString(),
+    ticket_id: ticketId, step_node_id: node.id, action: 'workflow_action', actor_id: 'workflow-engine', actor_name: 'Workflow Engine', comments: message, decision_at: new Date().toISOString(),
   });
 }
 
@@ -105,8 +105,40 @@ async function executeAction(ticket: any, node: Node) {
     case 'assign_user_node': updates.assigned_user = data.user_name || data.user_id || ''; if (updates.assigned_user) updates.current_assignees_json = [updates.assigned_user]; break;
     case 'set_priority_node': updates.priority = data.priority || 'high'; break;
     case 'set_status_node': updates.status = data.status || 'assigned'; if (data.pending_reason) updates.pending_reason = data.pending_reason; break;
-    case 'attach_sla_node': { const hours = Number(data.sla_ttr_hours ?? data.sla_ttr ?? 48); if (hours > 0) updates.sla_deadline = new Date(Date.now() + hours * 3600000).toISOString(); break; }
-    case 'attach_ola_node': { const hours = Number(data.ola_target_hours ?? 4); if (hours > 0) updates.ola_deadline = new Date(Date.now() + hours * 3600000).toISOString(); break; }
+    case 'attach_sla_node': {
+      const policyName = data.sla_policy_name || 'Standard SLA (48h)';
+      let durationMs = 48 * 60 * 60 * 1000;
+      if (policyName.includes('4h')) {
+        durationMs = 4 * 60 * 60 * 1000;
+      } else if (policyName.includes('1h')) {
+        durationMs = 1 * 60 * 60 * 1000;
+      } else if (policyName.includes('48h')) {
+        durationMs = 48 * 60 * 60 * 1000;
+      } else {
+        const hours = Number(data.sla_ttr_hours ?? data.sla_ttr ?? 48);
+        if (hours > 0) durationMs = hours * 3600000;
+      }
+      const deadline = new Date(Date.now() + durationMs).toISOString();
+      updates.sla_deadline = deadline;
+      updates.sla_ttr_deadline = deadline;
+      break;
+    }
+    case 'attach_ola_node': {
+      const policyName = data.ola_policy_name || 'Standard OLA (4h)';
+      let durationMs = 4 * 60 * 60 * 1000;
+      if (policyName.includes('2h')) {
+        durationMs = 2 * 60 * 60 * 1000;
+      } else if (policyName.includes('30m')) {
+        durationMs = 30 * 60 * 1000;
+      } else if (policyName.includes('4h')) {
+        durationMs = 4 * 60 * 60 * 1000;
+      } else {
+        const hours = Number(data.ola_target_hours ?? 4);
+        if (hours > 0) durationMs = hours * 3600000;
+      }
+      updates.ola_deadline = new Date(Date.now() + durationMs).toISOString();
+      break;
+    }
     case 'set_watcher_node': { const watcher = data.watcher_name || data.watcher_id || ''; if (watcher) updates.observer_id = Array.from(new Set([...String(ticket.observer_id || '').split(',').map((v) => v.trim()).filter(Boolean), watcher])).join(', '); break; }
     case 'set_solution_node': updates.solution_type = data.solution_type || 'resolved'; updates.solution_description = data.solution_description || data.label || ''; break;
     case 'update_record': Object.assign(updates, data.ticket_updates || {}); break;
@@ -134,12 +166,33 @@ async function run(ticket: any, workflow: any, startNodeId: string, suppliedValu
       }
       const updatedObserverId = currentObservers.join(', ');
 
+      let stepOlaHours = node.data?.ola_hours;
+      let stepOlaMinutes = node.data?.ola_minutes;
+      if (stepOlaHours === undefined && (node as any).ola_hours !== undefined) stepOlaHours = (node as any).ola_hours;
+      if (stepOlaMinutes === undefined && (node as any).ola_minutes !== undefined) stepOlaMinutes = (node as any).ola_minutes;
+      const hours = Number(stepOlaHours ?? 4);
+      const minutes = Number(stepOlaMinutes ?? 0);
+      const olaMs = (hours * 60 + minutes) * 60 * 1000;
+      const stepOlaDeadline = new Date(Date.now() + olaMs).toISOString();
+
+      const stepOlaStr = hours > 0 ? `${Math.round(hours)}h ${minutes > 0 ? `${minutes}m` : ''}` : `${minutes}m`;
+      await dbCreate('approval_log', {
+        id: `log_ola_graph_start_${Date.now()}`,
+        ticket_id: current.id,
+        actor_id: 'System',
+        actor_name: 'OLA Tracker',
+        action: 'ola_started',
+        comments: `[OLA Tracker]: Active Step OLA for "${node.data?.label || (node as any).name || 'Approval Step'}" started. Target: ${stepOlaStr}. Deadline is ${new Date(stepOlaDeadline).toLocaleString()}.`,
+        decision_at: new Date().toISOString(),
+      });
+
       return dbUpdate('tickets', current.id, {
         status: 'pending',
         current_step_node_id: node.id,
         current_step_order: index + 1,
         current_assignees_json: [resolved],
         observer_id: updatedObserverId,
+        ola_deadline: stepOlaDeadline,
         date_updated: new Date().toISOString()
       });
     }
