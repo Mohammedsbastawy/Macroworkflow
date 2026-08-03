@@ -133,6 +133,8 @@ CREATE TABLE `Tickets` (
   `PolicyChecked` TINYINT(1),
   `Unit` VARCHAR(255),
   `TargetGroupIDsJson` JSON,
+  `AssignedGroup` VARCHAR(255) NULL,
+  `AssignedUser` VARCHAR(255) NULL,
   `TargetDepartmentIDsJson` JSON
 );
 
