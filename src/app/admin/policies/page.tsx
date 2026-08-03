@@ -436,8 +436,16 @@ export default function PoliciesPage() {
       const localCustom: DepartmentPolicyContainer[] = JSON.parse(localStorage.getItem("custom_department_policies") || "[]");
 
       const combinedMap = new Map<string, DepartmentPolicyContainer>();
-      (pRes || []).forEach((p: any) => combinedMap.set(p.id, p));
-      localCustom.forEach((p: any) => combinedMap.set(p.id, p));
+      // DB is the primary source of truth
+      const dbPolicyIds = new Set<string>();
+      (pRes || []).forEach((p: any) => {
+        combinedMap.set(p.id, p);
+        dbPolicyIds.add(p.id);
+      });
+      // localStorage only contributes items not already in DB (e.g. offline-created)
+      localCustom.forEach((p: any) => {
+        if (!dbPolicyIds.has(p.id)) combinedMap.set(p.id, p);
+      });
 
       const filtered = Array.from(combinedMap.values()).filter((p: any) => !deletedIds.includes(p.id));
 

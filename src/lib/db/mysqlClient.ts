@@ -11,6 +11,7 @@ const pool = mysql.createPool({
   waitForConnections: true,
   queueLimit: 0,
   timezone: '+00:00',
+  charset: 'utf8mb4',
 });
 
 // JSON Column lists to automatically parse/serialize
