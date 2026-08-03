@@ -603,6 +603,11 @@ export async function fetchPoliciesAction() {
           : r.ApplyToAll;
         const deptIds = r.DepartmentIDsJson || (deptId ? [deptId] : []);
         const groupIds = r.GroupIDsJson || [];
+        // Fallback for case-sensitivity on different OS DB engines
+        let rules = r.RulesJson || r.rules_json || r.rulesjson || [];
+        if (typeof rules === 'string') {
+          try { rules = JSON.parse(rules); } catch (e) { rules = []; }
+        }
         return {
           id: r.PolicyID,
           name: r.PolicyName,
@@ -610,7 +615,7 @@ export async function fetchPoliciesAction() {
           description: r.Description,
           code: r.PolicyCode,
           is_active: r.IsActive,
-          rules_json: r.RulesJson || [],
+          rules_json: Array.isArray(rules) ? rules : [],
           apply_to_all: applyToAll,
           department_ids_json: deptIds,
           group_ids_json: groupIds,
