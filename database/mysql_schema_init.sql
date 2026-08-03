@@ -65,7 +65,7 @@ CREATE TABLE `SystemUserGroups` (
 
 DROP TABLE IF EXISTS `Workflows`;
 CREATE TABLE `Workflows` (
-  `WorkflowID` VARCHAR(36) PRIMARY KEY,
+  `WorkflowID` VARCHAR(255) PRIMARY KEY,
   `WorkflowName` VARCHAR(255) NOT NULL,
   `WorkflowSlug` VARCHAR(100) NOT NULL,
   `Category` VARCHAR(100),
@@ -75,6 +75,7 @@ CREATE TABLE `Workflows` (
   `Version` INT,
   `PublishedVersion` INT,
   `SlaTotalHours` INT,
+  `VisibilityRulesJson` JSON,
   `SlaBreachAction` VARCHAR(50),
   `ReactFlowGraphJson` JSON,
   `DateCreated` TIMESTAMP NULL,
@@ -89,7 +90,7 @@ DROP TABLE IF EXISTS `Tickets`;
 CREATE TABLE `Tickets` (
   `TicketID` VARCHAR(36) PRIMARY KEY,
   `TicketNumber` VARCHAR(100) NOT NULL,
-  `WorkflowID` VARCHAR(36) NOT NULL,
+  `WorkflowID` VARCHAR(255) NOT NULL,
   `WorkflowVersion` INT NOT NULL,
   `WorkflowSnapshotJson` JSON NOT NULL,
   `RequesterUserID` VARCHAR(100) NOT NULL,
@@ -297,7 +298,7 @@ CREATE TABLE `policy_travel_rates` (
 DROP TABLE IF EXISTS `workflow_simulations`;
 CREATE TABLE `workflow_simulations` (
   `id` VARCHAR(36) PRIMARY KEY,
-  `workflow_id` VARCHAR(100) NOT NULL,
+  `workflow_id` VARCHAR(255) NOT NULL,
   `name` VARCHAR(255) NOT NULL,
   `description` TEXT,
   `trigger_rules_json` JSON,
