@@ -11,9 +11,37 @@ export interface AuthGuardProps {
   allowRoles?: Array<'admin' | 'selfservice' | 'agent'>;
 }
 
+/**
+ * Build a minimal SystemUser directly from the NextAuth session data.
+ * Used as an immediate fallback so we never show "You are not signed in"
+ * to an already-authenticated user while the async DB lookup is in flight.
+ */
+function buildUserFromSession(session: any): SystemUser {
+  const rawRole = (session?.user?.role as string) || "selfservice";
+  const role = (["admin", "selfservice", "agent"].includes(rawRole)
+    ? rawRole
+    : "selfservice") as SystemUser["role"];
+  return {
+    id: session?.user?.id || "",
+    name: session?.user?.name || "",
+    email: session?.user?.email || "",
+    department_id: "",
+    group_ids: [],
+    role,
+    roles: (session?.user?.roles as SystemUser["roles"]) || [role],
+    avatar_initials:
+      (session?.user?.name || "?")
+        .split(" ")
+        .map((w: string) => w[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2) || "?",
+  };
+}
+
 export function AuthGuard({ children, requiredModule, allowRoles }: AuthGuardProps) {
   const { data: session, status } = useSession();
-  const [currentUser, setCurrentUser] = useState<SystemUser | null>(null);
+  const [dbUser, setDbUser] = useState<SystemUser | null>(null);
 
   const sessionUserId = (session?.user?.id as string) || "";
 
@@ -27,7 +55,7 @@ export function AuthGuard({ children, requiredModule, allowRoles }: AuthGuardPro
         if (cancelled) return;
         const found = dbUsers.find((u: any) => u.id === sessionUserId);
         if (found) {
-          setCurrentUser(found as any);
+          setDbUser(found as any);
           // Mirror to storage so existing downstream components (Topbar, etc.) stay in sync.
           safeStorage.setItem("system_user", JSON.stringify(found));
           safeStorage.removeItem("simulated_user_id");
@@ -42,7 +70,8 @@ export function AuthGuard({ children, requiredModule, allowRoles }: AuthGuardPro
     };
   }, [status, sessionUserId]);
 
-  if (status === "loading" || (status === "authenticated" && !currentUser)) {
+  // Still initialising NextAuth session — show a brief loading state.
+  if (status === "loading") {
     return (
       <div style={{ padding: 40, textAlign: "center", color: "var(--color-text-muted)" }}>
         🔒 Verifying enterprise permissions & security credentials...
@@ -50,7 +79,8 @@ export function AuthGuard({ children, requiredModule, allowRoles }: AuthGuardPro
     );
   }
 
-  if (status === "unauthenticated" || !currentUser) {
+  // Not logged in at all → show sign-in prompt.
+  if (status === "unauthenticated") {
     return (
       <div style={{ padding: 40, textAlign: "center", color: "var(--color-text-muted)" }}>
         <div style={{ fontSize: 40, marginBottom: 8 }}>🔐</div>
@@ -61,6 +91,10 @@ export function AuthGuard({ children, requiredModule, allowRoles }: AuthGuardPro
       </div>
     );
   }
+
+  // User IS authenticated — use the rich DB record once it arrives,
+  // otherwise fall back to session data so we never flash the sign-in screen.
+  const currentUser: SystemUser = dbUser || buildUserFromSession(session);
 
   // 1. Role-based restriction check
   if (allowRoles && !allowRoles.includes(currentUser.role)) {
