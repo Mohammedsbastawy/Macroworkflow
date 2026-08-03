@@ -84,8 +84,10 @@ function formatToMySqlDateTime(val: any): any {
 function parseJsonColumns(row: any) {
   if (!row) return row;
   const parsed = { ...row };
+  const lowerJsonKeys = JSON_KEYS.map(k => k.toLowerCase());
   for (const key of Object.keys(parsed)) {
-    if (JSON_KEYS.includes(key) && parsed[key] !== null) {
+    const isJsonColumn = lowerJsonKeys.includes(key.toLowerCase()) || key.toLowerCase().endsWith('json');
+    if (isJsonColumn && parsed[key] !== null) {
       if (typeof parsed[key] === 'string') {
         try {
           parsed[key] = JSON.parse(parsed[key]);
