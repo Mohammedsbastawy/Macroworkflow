@@ -12,8 +12,9 @@ CREATE TABLE `Departments` (
   `CreatedAt` TIMESTAMP NULL,
   `UpdatedAt` TIMESTAMP NULL,
   `HeadUserID` VARCHAR(255),
-  `DeletedAt` TIMESTAMP NULL
-);
+  `DeletedAt` TIMESTAMP NULL,
+  FOREIGN KEY (`ParentDepartmentID`) REFERENCES `Departments` (`DepartmentID`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `Users`;
 CREATE TABLE `Users` (
@@ -42,8 +43,10 @@ CREATE TABLE `Users` (
   `DelegationEndDate` TIMESTAMP NULL,
   `DelegationNotes` TEXT,
   `CanAssignGroupTickets` TINYINT(1),
-  `DeletedAt` TIMESTAMP NULL
-);
+  `DeletedAt` TIMESTAMP NULL,
+  FOREIGN KEY (`DepartmentID`) REFERENCES `Departments` (`DepartmentID`) ON DELETE SET NULL,
+  FOREIGN KEY (`DirectManagerUserID`) REFERENCES `Users` (`UserID`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `BusinessGroups`;
 CREATE TABLE `BusinessGroups` (
@@ -135,8 +138,11 @@ CREATE TABLE `Tickets` (
   `TargetGroupIDsJson` JSON,
   `AssignedGroup` VARCHAR(255) NULL,
   `AssignedUser` VARCHAR(255) NULL,
-  `TargetDepartmentIDsJson` JSON
-);
+  `TargetDepartmentIDsJson` JSON,
+  FOREIGN KEY (`WorkflowID`) REFERENCES `Workflows` (`WorkflowID`) ON DELETE CASCADE,
+  FOREIGN KEY (`RequesterUserID`) REFERENCES `Users` (`UserID`) ON DELETE CASCADE,
+  FOREIGN KEY (`RequesterDepartmentID`) REFERENCES `Departments` (`DepartmentID`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `TicketValues`;
 CREATE TABLE `TicketValues` (
@@ -147,8 +153,9 @@ CREATE TABLE `TicketValues` (
   `ValueNumber` DECIMAL(15, 2),
   `ValueDate` TIMESTAMP NULL,
   `ValueJson` JSON,
-  `FileAttachmentID` VARCHAR(36)
-);
+  `FileAttachmentID` VARCHAR(36),
+  FOREIGN KEY (`TicketID`) REFERENCES `Tickets` (`TicketID`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `TicketObservers`;
 CREATE TABLE `TicketObservers` (

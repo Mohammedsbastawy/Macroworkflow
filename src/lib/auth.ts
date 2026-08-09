@@ -52,7 +52,7 @@ async function verifyPassword(user: any, password: string): Promise<boolean> {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: 60 * 60 * 8 },
-  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || (process.env.NODE_ENV === 'development' ? 'dev-secret-only-for-development' : undefined),
   pages: { signIn: "/login", signOut: "/login", error: "/login" },
   trustHost: true,
   useSecureCookies: false,
