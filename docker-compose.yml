@@ -37,7 +37,7 @@ services:
       MYSQL_PASSWORD: emacro_password_strong
       PORT: 3000
       NODE_ENV: production
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://192.168.3.48}
       NEXTAUTH_SECRET: super-secret-key-for-nextauth-production
     depends_on:
       db:
