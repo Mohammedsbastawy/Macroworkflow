@@ -115,6 +115,182 @@ export function resolveTable(collection: string): string {
   return TABLE_NAME_MAP[collection] || collection;
 }
 
+// Mapping from PascalCase/legacy column names to unified snake_case MySQL columns
+const COLUMN_NAME_MAP: Record<string, string> = {
+  // system_users columns
+  UserID: 'id',
+  UserName: 'name',
+  UserEmail: 'email',
+  Username: 'username',
+  Phone: 'phone',
+  DepartmentID: 'department_id',
+  GroupIDsJson: 'group_ids_json',
+  Role: 'role',
+  RolesJson: 'roles_json',
+  AvatarInitials: 'avatar_initials',
+  JobTitle: 'job_title',
+  DirectManagerUserID: 'direct_manager_id',
+  DirectManagerID: 'direct_manager_id',
+  Unit: 'unit',
+  IsActive: 'is_active',
+  LoginName: 'login_name',
+  PasswordHash: 'password_hash',
+  AuthType: 'auth_type',
+  AzureAdId: 'azure_ad_id',
+  M365TokenJson: 'm365_token_json',
+  M365MailEnabled: 'm365_mail_enabled',
+  DelegatedUserId: 'delegated_user_id',
+  DelegationEnabled: 'delegation_enabled',
+  DelegationStartDate: 'delegation_start_date',
+  DelegationEndDate: 'delegation_end_date',
+  DelegationNotes: 'delegation_notes',
+  CanAssignGroupTickets: 'can_assign_group_tickets',
+  DeletedAt: 'deleted_at',
+
+  // departments columns
+  DepartmentName: 'name',
+  DepartmentCode: 'code',
+  ParentDepartmentID: 'parent_department_id',
+  ManagerUserID: 'manager_user_id',
+  HeadUserID: 'head_user_id',
+
+  // business_groups columns
+  BusinessGroupID: 'id',
+  BusinessGroupName: 'name',
+  BusinessGroupCode: 'code',
+  MemberUserIDsJson: 'member_user_ids_json',
+
+  // workflows columns
+  WorkflowID: 'id',
+  WorkflowName: 'name',
+  WorkflowSlug: 'slug',
+  Category: 'category',
+  Description: 'description',
+  Icon: 'icon',
+  Color: 'color',
+  Version: 'version',
+  PublishedVersion: 'published_version',
+  SlaTotalHours: 'sla_total_hours',
+  SlaBreachAction: 'sla_breach_action',
+  ReactFlowGraphJson: 'react_flow_graph_json',
+  FieldsJson: 'fields_json',
+  StepsJson: 'steps_json',
+  VisibilityRulesJson: 'visibility_rules_json',
+  Status: 'status',
+  IsArchived: 'is_archived',
+  DateCreated: 'date_created',
+  DateUpdated: 'date_updated',
+
+  // tickets columns
+  TicketID: 'id',
+  TicketNumber: 'ticket_number',
+  WorkflowVersion: 'workflow_version',
+  WorkflowSnapshotJson: 'workflow_snapshot_json',
+  RequesterUserID: 'requester_id',
+  RequesterID: 'requester_id',
+  RequesterName: 'requester_name',
+  RequesterDepartmentID: 'requester_department_id',
+  Title: 'title',
+  Priority: 'priority',
+  CurrentStepNodeID: 'current_step_node_id',
+  CurrentStepOrder: 'current_step_order',
+  CurrentAssigneesJson: 'current_assignees_json',
+  SubmittedAt: 'submitted_at',
+  SlaDeadline: 'sla_deadline',
+  OlaDeadline: 'ola_deadline',
+  OlaClockPausedAt: 'ola_clock_paused_at',
+  OlaAccumulatedPauseMs: 'ola_accumulated_pause_ms',
+  SolvedAt: 'solved_at',
+  ClosedAt: 'closed_at',
+  Type: 'type',
+  Attachments: 'attachments',
+  SubcategoryID: 'subcategory_id',
+  Impact: 'impact',
+  Urgency: 'urgency',
+  LocationID: 'location_id',
+  RequesterDepartment: 'requester_department',
+  ObserverUserID: 'observer_user_id',
+  PendingReason: 'pending_reason',
+  SlaTtoDeadline: 'sla_tto_deadline',
+  SlaTtrDeadline: 'sla_ttr_deadline',
+  TimeSpent: 'time_spent',
+  ApprovalStatus: 'approval_status',
+  CurrentApprover: 'current_approver',
+  SolutionType: 'solution_type',
+  SolutionDescription: 'solution_description',
+  SolvedDate: 'solved_date',
+  BudgetChecked: 'budget_checked',
+  PolicyChecked: 'policy_checked',
+  TargetGroupIDsJson: 'target_group_ids_json',
+  AssignedGroup: 'assigned_group',
+  AssignedUser: 'assigned_user',
+  TargetDepartmentIDsJson: 'target_department_ids_json',
+
+  // ticket_values columns
+  TicketValueID: 'id',
+  FieldKey: 'field_key',
+  ValueText: 'value_text',
+  ValueNumber: 'value_number',
+  ValueDate: 'value_date',
+  ValueJson: 'value_json',
+  FileAttachmentID: 'file_attachment_id',
+
+  // approval_log columns
+  ApprovalLogID: 'id',
+  StepNodeID: 'step_node_id',
+  StepOrderSnapshot: 'step_order_snapshot',
+  ActorUserID: 'actor_user_id',
+  ActorUserName: 'actor_user_name',
+  Action: 'action',
+  Comments: 'comments',
+  DecisionAt: 'decision_at',
+  OlaElapsedMs: 'ola_elapsed_ms',
+  HashSha256: 'hash_sha256',
+
+  // policies columns
+  PolicyID: 'id',
+  PolicyName: 'name',
+  PolicyCode: 'code',
+  WorkflowSlugRef: 'workflow_slug',
+  MaxAmountLimit: 'max_amount_limit',
+  ErrorMessageAr: 'error_message_ar',
+  RulesJson: 'rules_json',
+  DepartmentIDsJson: 'department_ids_json',
+  ApplyToAll: 'apply_to_all',
+
+  // budgets columns
+  BudgetID: 'id',
+  FiscalYear: 'fiscal_year',
+  Quarter: 'quarter',
+  AllocatedAmount: 'allocated_amount',
+  SpentAmount: 'spent_amount',
+  Currency: 'currency',
+
+  // travel_zones columns
+  TravelZoneID: 'id',
+  TravelZoneName: 'name',
+  TravelZoneCode: 'code',
+
+  // ticket_observers columns
+  TicketObserverID: 'id',
+
+  // notifications columns
+  MetadataJson: 'metadata_json',
+};
+
+export function resolveColumn(col: string): string {
+  return COLUMN_NAME_MAP[col] || col;
+}
+
+// Resolve all keys in a filter/data object
+function resolveColumns(obj: Record<string, any>): Record<string, any> {
+  const resolved: Record<string, any> = {};
+  for (const key of Object.keys(obj)) {
+    resolved[resolveColumn(key)] = obj[key];
+  }
+  return resolved;
+}
+
 export function tablePk(collection: string): string {
   const resolved = resolveTable(collection);
   if (resolved === 'system_settings') return 'key';
@@ -205,9 +381,9 @@ function buildOrderByClause(sort: any): string {
       const trimmed = f.trim();
       if (!trimmed) return '';
       if (trimmed.startsWith('-')) {
-        return `\`${trimmed.slice(1)}\` DESC`;
+        return `\`${resolveColumn(trimmed.slice(1))}\` DESC`;
       }
-      return `\`${trimmed}\` ASC`;
+      return `\`${resolveColumn(trimmed)}\` ASC`;
     })
     .filter(Boolean);
 
@@ -226,10 +402,11 @@ export async function dbGet<T = any>(
   fields?: string[]
 ): Promise<T[]> {
   const tableName = resolveTable(collection);
-  const { sql: whereSql, values } = buildWhereClause(filter);
+  const resolvedFilter = filter ? resolveColumns(filter) : undefined;
+  const { sql: whereSql, values } = buildWhereClause(resolvedFilter);
   const orderSql = buildOrderByClause(sort);
   const limitSql = limit ? `LIMIT ${Number(limit)}` : '';
-  const columns = fields && fields.length > 0 ? fields.map((f) => `\`${f}\``).join(', ') : '*';
+  const columns = fields && fields.length > 0 ? fields.map((f) => `\`${resolveColumn(f)}\``).join(', ') : '*';
 
   const sql = `SELECT ${columns} FROM \`${tableName}\` ${whereSql} ${orderSql} ${limitSql};`;
   const [rows] = await pool.query(sql, values);
@@ -254,7 +431,8 @@ export async function dbCreate<T = any>(
 ): Promise<T> {
   const tableName = resolveTable(collection);
   const pk = tablePk(tableName);
-  const record = { ...data };
+  const resolved = resolveColumns(data);
+  const record = { ...resolved };
   if (!record[pk]) {
     record[pk] = crypto.randomUUID();
   }
@@ -286,7 +464,8 @@ export async function dbUpdate<T = any>(
 ): Promise<T> {
   const tableName = resolveTable(collection);
   const pk = tablePk(tableName);
-  const updateData = { ...data };
+  const resolved = resolveColumns(data);
+  const updateData = { ...resolved };
   delete updateData[pk];
 
   const columns = Object.keys(updateData);
