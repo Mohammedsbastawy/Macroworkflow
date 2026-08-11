@@ -1,6 +1,7 @@
 DROP DATABASE IF EXISTS emacro_dashboard;
 CREATE DATABASE emacro_dashboard CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE emacro_dashboard;
+SET FOREIGN_KEY_CHECKS = 0;
 
 DROP TABLE IF EXISTS `departments`;
 CREATE TABLE `departments` (
@@ -21,6 +22,7 @@ CREATE TABLE `system_users` (
   `id` VARCHAR(255) PRIMARY KEY,
   `name` VARCHAR(255),
   `email` VARCHAR(255),
+  `username` VARCHAR(255) NULL,
   `phone` VARCHAR(50),
   `department_id` VARCHAR(255),
   `group_ids_json` JSON,
@@ -385,3 +387,5 @@ CREATE TABLE `rule_actions` (
   `execution_order` INT DEFAULT 0,
   FOREIGN KEY (`rule_id`) REFERENCES `business_rules` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET FOREIGN_KEY_CHECKS = 1;
