@@ -1,8 +1,8 @@
 # 🤖 AGENTS.md — Macro Workflow System
 ## دليل الذكاء الاصطناعي — اقرأ هذا قبل أي تعديل
 
-> **⚠️ قاعدة ذهبية:** هذا النظام يعتمد بالكامل على **MySQL** كقاعدة بيانات وحيدة.
-> لا تكتب بيانات في الكود (hardcoded). لا تستخدم localStorage.
+> **⚠️ قاعدة ذهبية:** هذا النظام يعتمد بالكامل على **MySQL Direct Engine** (`src/lib/db/mysqlClient.ts`) كقاعدة بيانات وحيدة (`emacro_dashboard`).
+> لا تكتب بيانات مؤقتة بملفات محلية. لا تستخدم localStorage. جميع الاستعلامات تمر عبر `mysqlClient.ts`.
 
 ---
 
@@ -18,7 +18,10 @@ Server Actions  (src/app/actions/workflowActions.ts)
 Core Engine     (src/lib/engine/workflowCore.ts)
         |
         v
-MySQL Database (Direct SQL/ORM)
+MySQL Client    (src/lib/db/mysqlClient.ts)
+        |
+        v
+MySQL Database (emacro_dashboard)
 ```
 
 ---

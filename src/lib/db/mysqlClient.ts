@@ -35,36 +35,93 @@ const JSON_KEYS = [
   'ExecutionPathJson',
   'MetadataJson',
   'RolesJson',
-  'Attachments'
+  'Attachments',
+  'steps_json',
+  'fields_json',
+  'react_flow_graph_json',
+  'visibility_rules_json',
+  'workflow_snapshot_json',
+  'current_assignees_json',
+  'value_json',
+  'group_ids_json',
+  'member_user_ids_json',
+  'target_group_ids_json',
+  'target_department_ids_json',
+  'rules_json',
+  'auth_config_json',
+  'department_ids_json',
+  'trigger_rules_json',
+  'initial_form_data',
+  'execution_path_json',
+  'metadata_json',
+  'roles_json',
+  'attachments',
+  'm365_token_json',
+  'modules_json',
+  'actions_json'
 ];
 
-// Primary key column per table (PascalCase naming scheme)
-const TABLE_PK: Record<string, string> = {
-  Departments: 'DepartmentID',
-  Users: 'UserID',
-  BusinessGroups: 'BusinessGroupID',
-  SystemUserGroups: 'SystemUserGroupID',
-  Workflows: 'WorkflowID',
-  Tickets: 'TicketID',
-  TicketValues: 'TicketValueID',
-  TicketObservers: 'TicketObserverID',
-  TicketAssignees: 'TicketAssigneeID',
-  TicketComments: 'TicketCommentID',
-  ApprovalLog: 'ApprovalLogID',
-  ExternalApiEndpoints: 'ExternalApiEndpointID',
-  Policies: 'PolicyID',
-  Budgets: 'BudgetID',
-  TravelZones: 'TravelZoneID',
-  PolicyTravelRates: 'PolicyTravelRateID',
-  Notifications: 'NotificationID',
+// Mapping from PascalCase or legacy table names to unified snake_case MySQL tables
+const TABLE_NAME_MAP: Record<string, string> = {
+  Users: 'system_users',
+  system_users: 'system_users',
+  Departments: 'departments',
+  departments: 'departments',
+  BusinessGroups: 'business_groups',
+  business_groups: 'business_groups',
+  SystemUserGroups: 'system_user_groups',
+  system_user_groups: 'system_user_groups',
+  Workflows: 'workflows',
+  workflows: 'workflows',
+  Tickets: 'tickets',
+  tickets: 'tickets',
+  TicketValues: 'ticket_values',
+  ticket_values: 'ticket_values',
+  TicketObservers: 'ticket_observers',
+  ticket_observers: 'ticket_observers',
+  TicketAssignees: 'ticket_assignees',
+  ticket_assignees: 'ticket_assignees',
+  TicketComments: 'ticket_comments',
+  ticket_comments: 'ticket_comments',
+  ApprovalLog: 'approval_log',
+  approval_log: 'approval_log',
+  ExternalApiEndpoints: 'external_api_endpoints',
+  external_api_endpoints: 'external_api_endpoints',
+  Policies: 'policies',
+  policies: 'policies',
+  Budgets: 'budgets',
+  budgets: 'budgets',
+  TravelZones: 'travel_zones',
+  travel_zones: 'travel_zones',
+  PolicyTravelRates: 'policy_travel_rates',
+  policy_travel_rates: 'policy_travel_rates',
+  Notifications: 'notifications',
+  notifications: 'notifications',
+  SystemSettings: 'system_settings',
+  system_settings: 'system_settings',
+  WorkflowSimulations: 'workflow_simulations',
+  workflow_simulations: 'workflow_simulations',
+  RolePermissions: 'role_permissions',
+  role_permissions: 'role_permissions',
+  BusinessRules: 'business_rules',
+  business_rules: 'business_rules',
+  RuleCriteria: 'rule_criteria',
+  rule_criteria: 'rule_criteria',
+  RuleActions: 'rule_actions',
+  rule_actions: 'rule_actions',
 };
 
-function tablePk(collection: string): string {
-  return TABLE_PK[collection] || 'id';
+export function resolveTable(collection: string): string {
+  return TABLE_NAME_MAP[collection] || collection;
+}
+
+export function tablePk(collection: string): string {
+  const resolved = resolveTable(collection);
+  if (resolved === 'system_settings') return 'key';
+  return 'id';
 }
 
 function formatToMySqlDateTime(val: any): any {
-  // Handle Date objects directly
   if (val instanceof Date && !isNaN(val.getTime())) {
     const pad = (n: number, l = 2) => String(n).padStart(l, '0');
     return `${val.getUTCFullYear()}-${pad(val.getUTCMonth() + 1)}-${pad(val.getUTCDate())} ${pad(val.getUTCHours())}:${pad(val.getUTCMinutes())}:${pad(val.getUTCSeconds())}.${pad(val.getUTCMilliseconds(), 3)}`;
@@ -124,12 +181,10 @@ function buildWhereClause(filter: any): { sql: string; values: any[] } {
           clauses.push(`\`${key}\` IN (${val.map(() => '?').join(', ')})`);
           values.push(...val);
         } else {
-          // If empty array, force no match
           clauses.push('1 = 0');
         }
       }
     } else {
-      // Simple key-value eq mapping
       clauses.push(`\`${key}\` = ?`);
       values.push(fieldVal);
     }
@@ -170,12 +225,13 @@ export async function dbGet<T = any>(
   limit?: number,
   fields?: string[]
 ): Promise<T[]> {
+  const tableName = resolveTable(collection);
   const { sql: whereSql, values } = buildWhereClause(filter);
   const orderSql = buildOrderByClause(sort);
   const limitSql = limit ? `LIMIT ${Number(limit)}` : '';
   const columns = fields && fields.length > 0 ? fields.map((f) => `\`${f}\``).join(', ') : '*';
 
-  const sql = `SELECT ${columns} FROM \`${collection}\` ${whereSql} ${orderSql} ${limitSql};`;
+  const sql = `SELECT ${columns} FROM \`${tableName}\` ${whereSql} ${orderSql} ${limitSql};`;
   const [rows] = await pool.query(sql, values);
 
   return (rows as any[]).map(parseJsonColumns) as T[];
@@ -186,8 +242,9 @@ export async function dbGetOne<T = any>(
   id: string,
   fields?: string[]
 ): Promise<T | null> {
-  const pk = tablePk(collection);
-  const rows = await dbGet<T>(collection, { [pk]: id }, undefined, 1, fields);
+  const tableName = resolveTable(collection);
+  const pk = tablePk(tableName);
+  const rows = await dbGet<T>(tableName, { [pk]: id }, undefined, 1, fields);
   return rows.length > 0 ? rows[0] : null;
 }
 
@@ -195,8 +252,8 @@ export async function dbCreate<T = any>(
   collection: string,
   data: Record<string, any>
 ): Promise<T> {
-  const pk = tablePk(collection);
-  // Auto-generate UUID if no PK field is provided (tables use VARCHAR PKs without AUTO_INCREMENT)
+  const tableName = resolveTable(collection);
+  const pk = tablePk(tableName);
   const record = { ...data };
   if (!record[pk]) {
     record[pk] = crypto.randomUUID();
@@ -212,13 +269,13 @@ export async function dbCreate<T = any>(
   });
 
   const placeholders = columns.map(() => '?').join(', ');
-  const sql = `INSERT INTO \`${collection}\` (${columns.map((c) => `\`${c}\``).join(', ')}) VALUES (${placeholders});`;
+  const sql = `INSERT INTO \`${tableName}\` (${columns.map((c) => `\`${c}\``).join(', ')}) VALUES (${placeholders});`;
 
   const [result] = await pool.query(sql, values);
   const id = record[pk] || (result as any).insertId;
 
-  const created = await dbGetOne<T>(collection, String(id));
-  if (!created) throw new Error(`Insert failed to retrieve record ${id} from ${collection}`);
+  const created = await dbGetOne<T>(tableName, String(id));
+  if (!created) throw new Error(`Insert failed to retrieve record ${id} from ${tableName}`);
   return created;
 }
 
@@ -227,14 +284,15 @@ export async function dbUpdate<T = any>(
   id: string,
   data: Record<string, any>
 ): Promise<T> {
-  const pk = tablePk(collection);
+  const tableName = resolveTable(collection);
+  const pk = tablePk(tableName);
   const updateData = { ...data };
   delete updateData[pk];
 
   const columns = Object.keys(updateData);
   if (columns.length === 0) {
-    const existing = await dbGetOne<T>(collection, id);
-    if (!existing) throw new Error(`Record ${id} not found in ${collection}`);
+    const existing = await dbGetOne<T>(tableName, id);
+    if (!existing) throw new Error(`Record ${id} not found in ${tableName}`);
     return existing;
   }
 
@@ -247,11 +305,11 @@ export async function dbUpdate<T = any>(
     return formatToMySqlDateTime(val);
   });
 
-  const sql = `UPDATE \`${collection}\` SET ${setClauses} WHERE \`${pk}\` = ?;`;
+  const sql = `UPDATE \`${tableName}\` SET ${setClauses} WHERE \`${pk}\` = ?;`;
   await pool.query(sql, [...values, id]);
 
-  const updated = await dbGetOne<T>(collection, id);
-  if (!updated) throw new Error(`Record ${id} not found after update in ${collection}`);
+  const updated = await dbGetOne<T>(tableName, id);
+  if (!updated) throw new Error(`Record ${id} not found after update in ${tableName}`);
   return updated;
 }
 
@@ -259,8 +317,9 @@ export async function dbDelete(
   collection: string,
   id: string
 ): Promise<boolean> {
-  const pk = tablePk(collection);
-  const sql = `DELETE FROM \`${collection}\` WHERE \`${pk}\` = ?;`;
+  const tableName = resolveTable(collection);
+  const pk = tablePk(tableName);
+  const sql = `DELETE FROM \`${tableName}\` WHERE \`${pk}\` = ?;`;
   const [result] = await pool.query(sql, [id]);
   return (result as any).affectedRows > 0;
 }
@@ -278,13 +337,15 @@ export async function dbQuery<T = any>(sql: string, params: any[] = []): Promise
 }
 
 export async function dbDeleteWhere(collection: string, field: string, value: any): Promise<number> {
-  const sql = `DELETE FROM \`${collection}\` WHERE \`${field}\` = ?;`;
+  const tableName = resolveTable(collection);
+  const sql = `DELETE FROM \`${tableName}\` WHERE \`${field}\` = ?;`;
   const [result] = await pool.query(sql, [value]);
   return (result as any).affectedRows || 0;
 }
 
 export async function dbBulkCreate(collection: string, records: Record<string, any>[]): Promise<number> {
   if (!records || records.length === 0) return 0;
+  const tableName = resolveTable(collection);
   
   const CHUNK_SIZE = 500;
   let totalInserted = 0;
@@ -298,7 +359,7 @@ export async function dbBulkCreate(collection: string, records: Record<string, a
     const colNames = columns.map(c => `\`${c}\``).join(', ');
     
     const rowPlaceholders = chunk.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
-    const sql = `INSERT INTO \`${collection}\` (${colNames}) VALUES ${rowPlaceholders};`;
+    const sql = `INSERT INTO \`${tableName}\` (${colNames}) VALUES ${rowPlaceholders};`;
     
     const values: any[] = [];
     for (const record of chunk) {

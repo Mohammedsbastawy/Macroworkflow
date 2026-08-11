@@ -74,7 +74,7 @@ loadEnv();
     // 2. التحقق من وجود الهيكل الجديد (Users) لتفادي إعادة البناء على قاعدة قديمة
     const [tables] = await connection.query("SHOW TABLES");
     const existing = tables.map((row) => Object.values(row)[0]);
-    const hasNewSchema = existing.includes('Users') && existing.includes('Tickets');
+    const hasNewSchema = existing.includes('system_users') && existing.includes('tickets');
 
     if (existing.length > 0 && hasNewSchema) {
       console.log(`قاعدة البيانات "${config.database}" تحتوي بالفعل على الهيكل الجديد (${existing.length} جداول). تخطي بناء الهيكل.`);

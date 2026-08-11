@@ -23,24 +23,31 @@ declare module "next-auth" {
 async function findUserById(id: string): Promise<any | null> {
   const { dbGet } = await import("@/lib/db/mysqlClient");
   const { normalizeRole } = await import("@/lib/auth/role");
-  const rows = await dbGet("Users", { UserID: id });
+  let rows = await dbGet("system_users", { id });
+  if (rows.length === 0) {
+    rows = await dbGet("system_users", { UserID: id });
+  }
   const u = rows[0];
   if (!u) return null;
-  const role = normalizeRole(u.Role || "selfservice");
+  const userId = u.id || u.UserID;
+  const userName = u.name || u.UserName;
+  const userEmail = u.email || u.UserEmail;
+  const rawRole = u.role || u.Role || "selfservice";
+  const role = normalizeRole(rawRole);
+  const rolesJson = u.roles_json || u.RolesJson;
   let roles: string[];
-  if (Array.isArray(u.RolesJson)) roles = u.RolesJson.map(normalizeRole);
-  else if (Array.isArray(u.Roles)) roles = u.Roles.map(normalizeRole);
+  if (Array.isArray(rolesJson)) roles = rolesJson.map(normalizeRole);
   else roles = [role];
   return {
     ...u,
-    id: u.UserID,
-    name: u.UserName,
-    email: u.UserEmail,
+    id: userId,
+    name: userName,
+    email: userEmail,
     role,
     roles,
-    is_active: u.IsActive,
-    password_hash: u.PasswordHash,
-    auth_type: u.AuthType,
+    is_active: u.is_active ?? u.IsActive ?? 1,
+    password_hash: u.password_hash || u.PasswordHash,
+    auth_type: u.auth_type || u.AuthType || 'password',
   };
 }
 
@@ -79,15 +86,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (type === "microsoft") {
           const email = String(credentials?.email || "").toLowerCase();
           const { dbGet } = await import("@/lib/db/mysqlClient");
-          const rows = await dbGet("Users", { UserEmail: email });
+          let rows = await dbGet("system_users", { email });
+          if (rows.length === 0) {
+            rows = await dbGet("system_users", { UserEmail: email });
+          }
           const user = rows[0];
           if (!user) return null;
           const { normalizeRole } = await import("@/lib/auth/role");
-          const role = normalizeRole(user.Role || "selfservice");
+          const userId = user.id || user.UserID;
+          const userName = user.name || user.UserName;
+          const userEmail = user.email || user.UserEmail;
+          const role = normalizeRole(user.role || user.Role || "selfservice");
+          const rolesJson = user.roles_json || user.RolesJson;
           let roles: string[];
-          if (Array.isArray(user.RolesJson)) roles = user.RolesJson.map(normalizeRole);
+          if (Array.isArray(rolesJson)) roles = rolesJson.map(normalizeRole);
           else roles = [role];
-          return { id: user.UserID, name: user.UserName, email: user.UserEmail, role, roles };
+          return { id: userId, name: userName, email: userEmail, role, roles };
         }
         return null;
       },

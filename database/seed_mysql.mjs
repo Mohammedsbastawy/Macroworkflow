@@ -188,7 +188,7 @@ async function main() {
 
     // Insert or update Departments
     for (const d of departments) {
-      const sql = `INSERT INTO Departments (DepartmentID, DepartmentName, DepartmentCode, ParentDepartmentID, HeadUserID) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE DepartmentName=VALUES(DepartmentName), DepartmentCode=VALUES(DepartmentCode), ParentDepartmentID=VALUES(ParentDepartmentID), HeadUserID=VALUES(HeadUserID);`;
+      const sql = `INSERT INTO departments (id, name, code, parent_department_id, head_user_id) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), code=VALUES(code), parent_department_id=VALUES(parent_department_id), head_user_id=VALUES(head_user_id);`;
       const params = [d.id, d.name, d.code, d.parent_department_id, d.head_user_id];
       await pool.query(sql, params);
       console.log('OK dept:', d.id);
@@ -196,7 +196,7 @@ async function main() {
 
     // Insert or update Users
     for (const u of systemUsers) {
-      const sql = `INSERT INTO Users (UserID, UserName, UserEmail, DepartmentID, GroupIDsJson, Role, AvatarInitials, JobTitle, DirectManagerUserID, Unit, IsActive) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE UserName=VALUES(UserName), UserEmail=VALUES(UserEmail), DepartmentID=VALUES(DepartmentID), GroupIDsJson=VALUES(GroupIDsJson), Role=VALUES(Role), AvatarInitials=VALUES(AvatarInitials), JobTitle=VALUES(JobTitle), DirectManagerUserID=VALUES(DirectManagerUserID), Unit=VALUES(Unit), IsActive=VALUES(IsActive);`;
+      const sql = `INSERT INTO system_users (id, name, email, department_id, group_ids_json, role, avatar_initials, job_title, direct_manager_id, unit, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), email=VALUES(email), department_id=VALUES(department_id), group_ids_json=VALUES(group_ids_json), role=VALUES(role), avatar_initials=VALUES(avatar_initials), job_title=VALUES(job_title), direct_manager_id=VALUES(direct_manager_id), unit=VALUES(unit), is_active=VALUES(is_active);`;
       const params = [u.id, u.name, u.email, u.department_id, JSON.stringify(u.group_ids_json), u.role, u.avatar_initials, u.job_title, u.direct_manager_id, u.unit, u.is_active];
       await pool.query(sql, params);
       console.log('OK user:', u.id);
@@ -204,7 +204,7 @@ async function main() {
 
     // Insert or update BusinessGroups
     for (const g of businessGroups) {
-      const sql = `INSERT INTO BusinessGroups (BusinessGroupID, BusinessGroupName, BusinessGroupCode, MemberUserIDsJson, IsActive) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE BusinessGroupName=VALUES(BusinessGroupName), BusinessGroupCode=VALUES(BusinessGroupCode), MemberUserIDsJson=VALUES(MemberUserIDsJson), IsActive=VALUES(IsActive);`;
+      const sql = `INSERT INTO business_groups (id, name, code, member_user_ids_json, is_active) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), code=VALUES(code), member_user_ids_json=VALUES(member_user_ids_json), is_active=VALUES(is_active);`;
       const params = [g.id, g.name, g.code, JSON.stringify(g.member_user_ids_json), g.is_active];
       await pool.query(sql, params);
       console.log('OK group:', g.id);
@@ -212,7 +212,7 @@ async function main() {
 
     // Insert or update TravelZones
     for (const z of travelZones) {
-      const sql = `INSERT INTO TravelZones (TravelZoneID, TravelZoneName, TravelZoneCode, IsActive) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE TravelZoneName=VALUES(TravelZoneName), TravelZoneCode=VALUES(TravelZoneCode), IsActive=VALUES(IsActive);`;
+      const sql = `INSERT INTO travel_zones (id, name, code, is_active) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), code=VALUES(code), is_active=VALUES(is_active);`;
       const params = [z.id, z.name, z.code, z.is_active];
       await pool.query(sql, params);
     }
