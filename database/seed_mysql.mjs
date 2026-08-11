@@ -186,6 +186,9 @@ async function main() {
   try {
     console.log('Connected to MySQL:', process.env.MYSQL_HOST || 'localhost');
 
+    // Disable foreign key checks to prevent circular dependency issues
+    await pool.query('SET FOREIGN_KEY_CHECKS = 0;');
+
     // Insert or update Departments
     for (const d of departments) {
       const sql = `INSERT INTO departments (id, name, code, parent_department_id, head_user_id) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), code=VALUES(code), parent_department_id=VALUES(parent_department_id), head_user_id=VALUES(head_user_id);`;
@@ -223,6 +226,8 @@ async function main() {
     console.error('SEED_ERROR:', err.message);
     process.exitCode = 2;
   } finally {
+    // Re-enable foreign key checks
+    await pool.query('SET FOREIGN_KEY_CHECKS = 1;');
     await pool.end();
   }
 }
