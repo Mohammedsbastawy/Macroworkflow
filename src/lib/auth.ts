@@ -51,6 +51,32 @@ async function findUserById(id: string): Promise<any | null> {
   };
 }
 
+// البحث بالـ email أولاً (الأساسي)، ثم login_name كبديل
+async function findUserByLogin(username: string): Promise<any | null> {
+  const { dbGet } = await import("@/lib/db/mysqlClient");
+  const { normalizeRole } = await import("@/lib/auth/role");
+  const rows = await dbGet("system_users", { is_active: 1 });
+  const u =
+    rows.find((r: any) => (r.email || "").toLowerCase() === username.toLowerCase()) ||
+    rows.find((r: any) => (r.login_name || "").toLowerCase() === username.toLowerCase());
+  if (!u) return null;
+  const rawRole = u.role || "selfservice";
+  const role = normalizeRole(rawRole);
+  const rolesJson = u.roles_json;
+  const roles: string[] = Array.isArray(rolesJson) ? rolesJson.map(normalizeRole) : [role];
+  return {
+    ...u,
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role,
+    roles,
+    is_active: u.is_active ?? 1,
+    password_hash: u.password_hash,
+    auth_type: u.auth_type || 'password',
+  };
+}
+
 async function verifyPassword(user: any, password: string): Promise<boolean> {
   if (!user?.password_hash) return false;
   const bcrypt = await import("bcryptjs");
@@ -75,9 +101,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         const type = String(credentials?.type || "");
         if (type === "password") {
+          // authActions يمرر userId بعد ما يتحقق من الباسورد — نجيب اليوزر بالـ id مباشرة
           const id = String(credentials?.userId || "");
           const password = String(credentials?.password || "");
-          const user = await findUserById(id);
+          // دعم البحث بالـ id أو بالـ email/login_name
+          const user = id ? await findUserById(id) : await findUserByLogin(String(credentials?.email || ""));
           if (!user || !user.is_active) return null;
           const ok = await verifyPassword(user, password);
           if (!ok) return null;

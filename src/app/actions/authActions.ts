@@ -23,10 +23,11 @@ export async function loginWithPasswordAction(formData: FormData) {
 
   let user: any = null;
   try {
-    const active = await dbGet("Users", { IsActive: 1 });
+    // البحث بالـ email أولاً (الأساسي)، ثم login_name كبديل
+    const rows = await dbGet("system_users", { is_active: 1 });
     user =
-      active.find((u: any) => u.LoginName === username) ||
-      active.find((u: any) => (u.UserEmail || "").toLowerCase() === username.toLowerCase());
+      rows.find((u: any) => (u.email || "").toLowerCase() === username.toLowerCase()) ||
+      rows.find((u: any) => (u.login_name || "").toLowerCase() === username.toLowerCase());
   } catch (e) {
     console.error("login lookup error:", e);
     return { error: "Sign-in is temporarily unavailable. Please try again." };
@@ -36,18 +37,18 @@ export async function loginWithPasswordAction(formData: FormData) {
     return { error: "Account not found. Please contact your administrator." };
   }
 
-  const authType = (user.AuthType || "password").toLowerCase();
+  const authType = (user.auth_type || "password").toLowerCase();
   if (authType !== "password" && authType !== "both") {
     return {
       error: "This account signs in with Microsoft 365. Please use the 'Sign in with Microsoft' button.",
     };
   }
 
-  if (!user.PasswordHash) {
+  if (!user.password_hash) {
     return { error: "No password is set for this account. Contact your administrator." };
   }
 
-  const ok = await bcrypt.compare(password, user.PasswordHash);
+  const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) {
     return { error: "Incorrect username or password." };
   }
@@ -56,7 +57,7 @@ export async function loginWithPasswordAction(formData: FormData) {
   try {
     await signIn("credentials", {
       type: "password",
-      userId: user.UserID,
+      userId: user.id,
       password,
       redirect: false,
     });
