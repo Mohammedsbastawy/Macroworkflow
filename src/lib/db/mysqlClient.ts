@@ -474,6 +474,11 @@ export async function dbCreate<T = any>(
   const columns = Object.keys(record);
   const values = columns.map((col) => {
     let val = record[col];
+    if (tableName === 'approval_log' && col === 'actor_user_id') {
+      if (!val || val === 'System' || val === 'Approver' || val === 'OLA Tracker' || val === 'SLA Tracker') {
+        val = 'user-admin';
+      }
+    }
     if (val === '' && (FK_NULLABLE_COLUMNS.includes(col) || col.endsWith('_id') || col.endsWith('_user') || col.endsWith('_group'))) {
       val = null;
     }
@@ -515,6 +520,11 @@ export async function dbUpdate<T = any>(
   const setClauses = columns.map((c) => `\`${c}\` = ?`).join(', ');
   const values = columns.map((col) => {
     let val = updateData[col];
+    if (tableName === 'approval_log' && col === 'actor_user_id') {
+      if (!val || val === 'System' || val === 'Approver' || val === 'OLA Tracker' || val === 'SLA Tracker') {
+        val = 'user-admin';
+      }
+    }
     if (val === '' && (FK_NULLABLE_COLUMNS.includes(col) || col.endsWith('_id') || col.endsWith('_user') || col.endsWith('_group'))) {
       val = null;
     }

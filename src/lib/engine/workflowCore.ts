@@ -594,14 +594,17 @@ export async function submitRequest(params: {
     });
   }
 
+  const actorUid = reqUserObj?.id || (params.requesterId ? (params.requesterId.replace('_', '-')) : 'user-admin');
+  const actorUname = reqUserObj?.name || params.requesterName || params.requesterId || 'Ahmed Mohamed';
+
   // 4. Create initial audit log entry
   const logPayload = {
     ApprovalLogID: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     TicketID: createdTicket.TicketID || ticketId,
     StepNodeID: firstNodeId,
     StepOrderSnapshot: 1,
-    ActorUserID: params.requesterId || 'user_ahmed',
-    ActorUserName: params.requesterName || params.requesterId || 'Ahmed Mohamed',
+    ActorUserID: actorUid,
+    ActorUserName: actorUname,
     Action: 'submitted',
     Comments: 'Request submitted and routed automatically to first approval step.',
     DecisionAt: new Date().toISOString(),
@@ -614,7 +617,7 @@ export async function submitRequest(params: {
   await dbCreate('ApprovalLog', {
     ApprovalLogID: `log_ola_start_${Date.now()}`,
     TicketID: createdTicket.TicketID || ticketId,
-    ActorUserID: 'System',
+    ActorUserID: actorUid,
     ActorUserName: 'OLA Tracker',
     Action: 'ola_started',
     Comments: `[OLA Tracker]: Active Step OLA for "${firstStep?.name || 'First Step'}" started. Target: ${firstOlaStr}. Deadline is ${new Date(olaDeadline).toLocaleString()}.`,
@@ -625,7 +628,7 @@ export async function submitRequest(params: {
   await dbCreate('ApprovalLog', {
     ApprovalLogID: `log_sla_start_${Date.now()}`,
     TicketID: createdTicket.TicketID || ticketId,
-    ActorUserID: 'System',
+    ActorUserID: actorUid,
     ActorUserName: 'SLA Tracker',
     Action: 'sla_started',
     Comments: `[SLA Tracker]: SLA timers initiated. TTO Target: ${panelCfg.defaultSlaTto || '1 Hour'}, TTR Target: ${panelCfg.defaultSlaTtr || '8 Hours'}.`,
@@ -822,7 +825,7 @@ export async function getRequestById(
           ApprovalLogID: `log_tto_breach_${Date.now()}`,
           TicketID: ticket.TicketID,
           Action: 'sla_breached',
-          ActorUserID: 'System',
+          ActorUserID: 'user-admin',
           ActorUserName: 'SLA Tracker',
           Comments: `[Breach Alert] SLA TTO (Takeover) target has breached! Deadline was ${new Date(request.sla_tto_deadline).toLocaleString()}.`,
           DecisionAt: now.toISOString(),
@@ -841,7 +844,7 @@ export async function getRequestById(
           ApprovalLogID: `log_ttr_breach_${Date.now()}`,
           TicketID: ticket.TicketID,
           Action: 'sla_breached',
-          ActorUserID: 'System',
+          ActorUserID: 'user-admin',
           ActorUserName: 'SLA Tracker',
           Comments: `[Breach Alert] SLA TTR (Resolution) target has breached! Deadline was ${new Date(ttrDeadline).toLocaleString()}.`,
           DecisionAt: now.toISOString(),
@@ -861,7 +864,7 @@ export async function getRequestById(
           ApprovalLogID: `log_ola_breach_${Date.now()}`,
           TicketID: ticket.TicketID,
           Action: 'ola_breached',
-          ActorUserID: 'System',
+          ActorUserID: 'user-admin',
           ActorUserName: 'OLA Tracker',
           Comments: `[Breach Alert] Active Step OLA for "${stepName}" has breached! Deadline was ${new Date(request.ola_deadline).toLocaleString()}.`,
           DecisionAt: now.toISOString(),
@@ -905,7 +908,7 @@ export async function processApprovalAction(params: {
         TicketID: ticket.TicketID,
         StepNodeID: runtime.ticket.current_step_node_id,
         StepOrderSnapshot: runtime.ticket.current_step_order,
-        ActorUserID: params.actorName || 'Approver',
+        ActorUserID: 'user-admin',
         ActorUserName: params.actorName || 'Approver',
         Action: params.action,
         Comments: params.comments || `Action ${params.action} recorded.`,
@@ -1014,7 +1017,7 @@ export async function processApprovalAction(params: {
     TicketID: ticket.TicketID ?? ticket.id,
     StepNodeID: nextNodeId,
     StepOrderSnapshot: nextOrder,
-    ActorUserID: params.actorName || 'Approver',
+    ActorUserID: 'user-admin',
     ActorUserName: params.actorName || 'Approver',
     Action: params.action,
     Comments: (params.comments || `Action ${params.action} recorded.`) + appendComments,
@@ -1032,7 +1035,7 @@ export async function processApprovalAction(params: {
     await dbCreate('ApprovalLog', {
       ApprovalLogID: `log_ola_next_start_${Date.now()}`,
       TicketID: ticket.TicketID ?? ticket.id,
-      ActorUserID: 'System',
+      ActorUserID: 'user-admin',
       ActorUserName: 'OLA Tracker',
       Action: 'ola_started',
       Comments: `[OLA Tracker]: Active Step OLA for "${nextStep.name || 'Next Step'}" started. Target: ${nextOlaStr}. Deadline is ${new Date(olaDeadline).toLocaleString()}.`,
