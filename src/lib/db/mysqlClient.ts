@@ -444,6 +444,21 @@ export async function dbGetOne<T = any>(
   return rows.length > 0 ? rows[0] : null;
 }
 
+const FK_NULLABLE_COLUMNS = [
+  'assigned_user',
+  'assigned_group',
+  'requester_department_id',
+  'direct_manager_id',
+  'current_approver',
+  'location_id',
+  'subcategory_id',
+  'parent_department_id',
+  'manager_user_id',
+  'head_user_id',
+  'delegated_user_id',
+  'department_id'
+];
+
 export async function dbCreate<T = any>(
   collection: string,
   data: Record<string, any>
@@ -458,7 +473,10 @@ export async function dbCreate<T = any>(
 
   const columns = Object.keys(record);
   const values = columns.map((col) => {
-    const val = record[col];
+    let val = record[col];
+    if (val === '' && (FK_NULLABLE_COLUMNS.includes(col) || col.endsWith('_id') || col.endsWith('_user') || col.endsWith('_group'))) {
+      val = null;
+    }
     if (val !== null && typeof val === 'object' && !(val instanceof Date)) {
       return JSON.stringify(val);
     }
@@ -496,7 +514,10 @@ export async function dbUpdate<T = any>(
 
   const setClauses = columns.map((c) => `\`${c}\` = ?`).join(', ');
   const values = columns.map((col) => {
-    const val = updateData[col];
+    let val = updateData[col];
+    if (val === '' && (FK_NULLABLE_COLUMNS.includes(col) || col.endsWith('_id') || col.endsWith('_user') || col.endsWith('_group'))) {
+      val = null;
+    }
     if (val !== null && typeof val === 'object' && !(val instanceof Date)) {
       return JSON.stringify(val);
     }

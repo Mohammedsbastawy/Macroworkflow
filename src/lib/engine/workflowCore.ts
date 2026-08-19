@@ -483,7 +483,7 @@ export async function submitRequest(params: {
   );
 
   const requesterName = reqUserObj?.name || params.requesterName || params.requesterId || 'System User';
-  const requesterDept = reqUserObj?.department_id || 'IT Department';
+  const requesterDept = reqUserObj?.department_id || 'dept-it';
 
   // Resolve the first assignee dynamically based on assignee_type
   const firstAssigneeRaw = firstStep?.assignee_value || 'Department Manager';
@@ -544,20 +544,20 @@ export async function submitRequest(params: {
     WorkflowSnapshotJson: wf.steps,
     RequesterUserID: requester,
     RequesterName: requesterName,
-    RequesterDepartmentID: requesterDept,
+    RequesterDepartmentID: requesterDept || 'dept-it',
     Title: params.title || `${wf.name} — ${reqNumber}`,
     Priority: params.priority || panelCfg.defaultPriority || 'normal',
     Status: 'pending',
     CurrentStepNodeID: firstNodeId,
     CurrentStepOrder: firstStep?.step_order || 1,
     CurrentAssigneesJson: [firstAssignee],
-    AssignedGroup: resolvedGroup || '',
-    AssignedUser: defaultUser || '',
+    AssignedGroup: resolvedGroup || null,
+    AssignedUser: defaultUser || null,
     // Workflow Target Audience (Target Business Groups / Target Departments) — gates ticket visibility
     TargetGroupIDsJson: (wf.visibility_rules as any)?.group_ids || (wf as any).visibility_rules_json?.group_ids || [],
     TargetDepartmentIDsJson: (wf.visibility_rules as any)?.department_ids || (wf as any).visibility_rules_json?.department_ids || [],
-    LocationID: resolvedLocation || '',
-    Unit: resolvedUnit || '',
+    LocationID: resolvedLocation || null,
+    Unit: resolvedUnit || null,
     SubmittedAt: new Date().toISOString(),
     SlaDeadline: slaDeadline,
     SlaTtoDeadline: slaTtoDeadline,
