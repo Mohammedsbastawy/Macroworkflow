@@ -278,15 +278,34 @@ const COLUMN_NAME_MAP: Record<string, string> = {
   MetadataJson: 'metadata_json',
 };
 
-export function resolveColumn(col: string): string {
+export function resolveColumn(col: string, table?: string): string {
+  const tbl = table ? resolveTable(table) : '';
+  if (tbl === 'tickets') {
+    if (col === 'WorkflowID' || col === 'workflow_id' || col === 'WorkflowDefinitionID') return 'workflow_id';
+    if (col === 'TicketID' || col === 'id') return 'id';
+    if (col === 'RequesterUserID' || col === 'RequesterID' || col === 'requester_id') return 'requester_id';
+    if (col === 'RequesterDepartmentID' || col === 'requester_department_id') return 'requester_department_id';
+  } else if (tbl === 'workflows') {
+    if (col === 'WorkflowID' || col === 'id') return 'id';
+  } else if (tbl === 'ticket_values') {
+    if (col === 'TicketID' || col === 'ticket_id' || col === 'RequestID' || col === 'request_id') return 'ticket_id';
+    if (col === 'TicketValueID' || col === 'id') return 'id';
+  } else if (tbl === 'approval_log') {
+    if (col === 'TicketID' || col === 'ticket_id' || col === 'RequestID' || col === 'request_id') return 'ticket_id';
+    if (col === 'ApprovalLogID' || col === 'id') return 'id';
+  } else if (tbl === 'ticket_observers') {
+    if (col === 'TicketID' || col === 'ticket_id' || col === 'RequestID' || col === 'request_id') return 'ticket_id';
+    if (col === 'TicketObserverID' || col === 'id') return 'id';
+    if (col === 'UserID' || col === 'user_id') return 'user_id';
+  }
   return COLUMN_NAME_MAP[col] || col;
 }
 
 // Resolve all keys in a filter/data object
-function resolveColumns(obj: Record<string, any>): Record<string, any> {
+function resolveColumns(obj: Record<string, any>, table?: string): Record<string, any> {
   const resolved: Record<string, any> = {};
   for (const key of Object.keys(obj)) {
-    resolved[resolveColumn(key)] = obj[key];
+    resolved[resolveColumn(key, table)] = obj[key];
   }
   return resolved;
 }
@@ -373,7 +392,7 @@ function buildWhereClause(filter: any): { sql: string; values: any[] } {
 }
 
 // Build SQL ORDER BY clause from sort syntax
-function buildOrderByClause(sort: any): string {
+function buildOrderByClause(sort: any, table?: string): string {
   if (!sort) return '';
   const fields = Array.isArray(sort) ? sort : String(sort).split(',');
   const clauses = fields
@@ -381,9 +400,9 @@ function buildOrderByClause(sort: any): string {
       const trimmed = f.trim();
       if (!trimmed) return '';
       if (trimmed.startsWith('-')) {
-        return `\`${resolveColumn(trimmed.slice(1))}\` DESC`;
+        return `\`${resolveColumn(trimmed.slice(1), table)}\` DESC`;
       }
-      return `\`${resolveColumn(trimmed)}\` ASC`;
+      return `\`${resolveColumn(trimmed, table)}\` ASC`;
     })
     .filter(Boolean);
 
@@ -402,11 +421,11 @@ export async function dbGet<T = any>(
   fields?: string[]
 ): Promise<T[]> {
   const tableName = resolveTable(collection);
-  const resolvedFilter = filter ? resolveColumns(filter) : undefined;
+  const resolvedFilter = filter ? resolveColumns(filter, tableName) : undefined;
   const { sql: whereSql, values } = buildWhereClause(resolvedFilter);
-  const orderSql = buildOrderByClause(sort);
+  const orderSql = buildOrderByClause(sort, tableName);
   const limitSql = limit ? `LIMIT ${Number(limit)}` : '';
-  const columns = fields && fields.length > 0 ? fields.map((f) => `\`${resolveColumn(f)}\``).join(', ') : '*';
+  const columns = fields && fields.length > 0 ? fields.map((f) => `\`${resolveColumn(f, tableName)}\``).join(', ') : '*';
 
   const sql = `SELECT ${columns} FROM \`${tableName}\` ${whereSql} ${orderSql} ${limitSql};`;
   const [rows] = await pool.query(sql, values);
@@ -431,7 +450,7 @@ export async function dbCreate<T = any>(
 ): Promise<T> {
   const tableName = resolveTable(collection);
   const pk = tablePk(tableName);
-  const resolved = resolveColumns(data);
+  const resolved = resolveColumns(data, tableName);
   const record = { ...resolved };
   if (!record[pk]) {
     record[pk] = crypto.randomUUID();
@@ -464,7 +483,7 @@ export async function dbUpdate<T = any>(
 ): Promise<T> {
   const tableName = resolveTable(collection);
   const pk = tablePk(tableName);
-  const resolved = resolveColumns(data);
+  const resolved = resolveColumns(data, tableName);
   const updateData = { ...resolved };
   delete updateData[pk];
 
