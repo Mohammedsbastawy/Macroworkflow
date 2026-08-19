@@ -67,9 +67,25 @@ export function Sidebar() {
 
   const loadSimulatedData = async () => {
     const savedId = safeStorage.getItem("simulated_user_id");
-    if (savedId) {
+    const rawUser = safeStorage.getItem("system_user");
+    let activeUser: SystemUser | null = null;
+
+    if (rawUser) {
+      try {
+        const parsed = JSON.parse(rawUser);
+        if (parsed && (!savedId || parsed.id === savedId)) {
+          activeUser = parsed;
+        }
+      } catch (e) {}
+    }
+
+    if (!activeUser && savedId) {
       const found = SYSTEM_USERS.find((u) => u.id === savedId);
-      if (found) setCurrentUser(found);
+      if (found) activeUser = found;
+    }
+
+    if (activeUser) {
+      setCurrentUser(activeUser);
     }
 
     try {
@@ -88,12 +104,14 @@ export function Sidebar() {
     const handleMobileClose = () => setMobileOpen(false);
 
     window.addEventListener("user-simulated-switch", handleUserSwitch);
+    window.addEventListener("system_user_changed", handleUserSwitch);
     window.addEventListener("profile-permissions-updated", handleUserSwitch);
     window.addEventListener("mobile-sidebar-toggle", handleMobileToggle);
     window.addEventListener("mobile-sidebar-close", handleMobileClose);
 
     return () => {
       window.removeEventListener("user-simulated-switch", handleUserSwitch);
+      window.removeEventListener("system_user_changed", handleUserSwitch);
       window.removeEventListener("profile-permissions-updated", handleUserSwitch);
       window.removeEventListener("mobile-sidebar-toggle", handleMobileToggle);
       window.removeEventListener("mobile-sidebar-close", handleMobileClose);

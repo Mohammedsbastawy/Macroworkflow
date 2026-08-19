@@ -51,6 +51,18 @@ export function Topbar() {
         const fetched = (await fetchSystemUsersAction()) as SystemUser[];
         if (cancelled) return;
         if (fetched && fetched.length > 0) setUsersList(fetched);
+
+        // Check if there is an active simulated user stored
+        const savedSimulatedId = safeStorage.getItem("simulated_user_id");
+        if (savedSimulatedId) {
+          const simulatedFound = fetched?.find((u) => u.id === savedSimulatedId);
+          if (simulatedFound) {
+            setCurrentUser(simulatedFound as unknown as TopbarUser);
+            safeStorage.setItem("system_user", JSON.stringify(simulatedFound));
+            return;
+          }
+        }
+
         const found =
           fetched?.find((u) => u.id === sessionUserId) ||
           ({
@@ -62,12 +74,23 @@ export function Topbar() {
           } as SystemUser);
         if (found) {
           setCurrentUser(found as unknown as TopbarUser);
-          // Mirror to storage for any remaining storage-based consumers.
           safeStorage.setItem("system_user", JSON.stringify(found));
-          safeStorage.removeItem("simulated_user_id");
         }
       } catch (e) {
         if (!cancelled) {
+          const savedSimulatedId = safeStorage.getItem("simulated_user_id");
+          if (savedSimulatedId) {
+            const rawUser = safeStorage.getItem("system_user");
+            if (rawUser) {
+              try {
+                const parsed = JSON.parse(rawUser);
+                if (parsed && parsed.id === savedSimulatedId) {
+                  setCurrentUser(parsed);
+                  return;
+                }
+              } catch (err) {}
+            }
+          }
           setCurrentUser({
             id: sessionUserId,
             name: session?.user?.name || "User",
@@ -79,10 +102,26 @@ export function Topbar() {
       }
     };
     load();
+
+    const handleSwitch = () => {
+      const savedId = safeStorage.getItem("simulated_user_id");
+      if (savedId && usersList.length > 0) {
+        const found = usersList.find((u) => u.id === savedId);
+        if (found) {
+          setCurrentUser(found as unknown as TopbarUser);
+        }
+      }
+    };
+
+    window.addEventListener("user-simulated-switch", handleSwitch);
+    window.addEventListener("system_user_changed", handleSwitch);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("user-simulated-switch", handleSwitch);
+      window.removeEventListener("system_user_changed", handleSwitch);
     };
-  }, [sessionUserId, sessionRole, session?.user?.name, session?.user?.email]);
+  }, [sessionUserId, sessionRole, session?.user?.name, session?.user?.email, usersList.length]);
 
   const handleSwitchUser = (userId: string) => {
     const found = usersList.find((u) => u.id === userId);

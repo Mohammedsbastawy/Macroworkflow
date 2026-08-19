@@ -42,31 +42,58 @@ function buildUserFromSession(session: any): SystemUser {
 export function AuthGuard({ children, requiredModule, allowRoles }: AuthGuardProps) {
   const { data: session, status } = useSession();
   const [dbUser, setDbUser] = useState<SystemUser | null>(null);
+  const [simulatedUser, setSimulatedUser] = useState<SystemUser | null>(null);
 
   const sessionUserId = (session?.user?.id as string) || "";
 
   useEffect(() => {
     if (status !== "authenticated" || !sessionUserId) return;
     let cancelled = false;
+
     const resolve = async () => {
       try {
         const { fetchSystemUsersAction } = await import("@/app/actions/workflowActions");
         const dbUsers = await fetchSystemUsersAction();
         if (cancelled) return;
-        const found = dbUsers.find((u: any) => u.id === sessionUserId);
-        if (found) {
-          setDbUser(found as any);
-          // Mirror to storage so existing downstream components (Topbar, etc.) stay in sync.
-          safeStorage.setItem("system_user", JSON.stringify(found));
-          safeStorage.removeItem("simulated_user_id");
+
+        const foundSessionUser = dbUsers.find((u: any) => u.id === sessionUserId);
+        if (foundSessionUser) {
+          setDbUser(foundSessionUser as any);
+        }
+
+        const savedSimulatedId = safeStorage.getItem("simulated_user_id");
+        if (savedSimulatedId) {
+          const foundSim = dbUsers.find((u: any) => u.id === savedSimulatedId);
+          if (foundSim) {
+            setSimulatedUser(foundSim as any);
+            safeStorage.setItem("system_user", JSON.stringify(foundSim));
+          } else {
+            setSimulatedUser(null);
+          }
+        } else {
+          setSimulatedUser(null);
+          if (foundSessionUser) {
+            safeStorage.setItem("system_user", JSON.stringify(foundSessionUser));
+          }
         }
       } catch (e) {
         console.error("Failed to resolve authenticated user in AuthGuard:", e);
       }
     };
+
     resolve();
+
+    const handleSwitch = () => {
+      resolve();
+    };
+
+    window.addEventListener("user-simulated-switch", handleSwitch);
+    window.addEventListener("system_user_changed", handleSwitch);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("user-simulated-switch", handleSwitch);
+      window.removeEventListener("system_user_changed", handleSwitch);
     };
   }, [status, sessionUserId]);
 
@@ -92,9 +119,9 @@ export function AuthGuard({ children, requiredModule, allowRoles }: AuthGuardPro
     );
   }
 
-  // User IS authenticated — use the rich DB record once it arrives,
+  // User IS authenticated — use simulated user if active for testing, or rich DB record,
   // otherwise fall back to session data so we never flash the sign-in screen.
-  const currentUser: SystemUser = dbUser || buildUserFromSession(session);
+  const currentUser: SystemUser = simulatedUser || dbUser || buildUserFromSession(session);
 
   // 1. Role-based restriction check
   if (allowRoles && !allowRoles.includes(currentUser.role)) {

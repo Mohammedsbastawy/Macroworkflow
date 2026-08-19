@@ -55,6 +55,15 @@ export default function RequestsPage() {
       }
     };
     load();
+
+    const handleSwitch = () => load();
+    window.addEventListener("user-simulated-switch", handleSwitch);
+    window.addEventListener("system_user_changed", handleSwitch);
+
+    return () => {
+      window.removeEventListener("user-simulated-switch", handleSwitch);
+      window.removeEventListener("system_user_changed", handleSwitch);
+    };
   }, []);
 
   const filteredRequests = requests.filter((r) => {

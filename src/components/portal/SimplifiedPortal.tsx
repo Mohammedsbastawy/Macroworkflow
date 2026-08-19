@@ -15,9 +15,20 @@ export function SimplifiedPortal() {
   const [loading, setLoading] = useState(true);
 
   const loadPortalData = async () => {
-    const savedId = localStorage.getItem("simulated_user_id");
+    const savedId = typeof window !== "undefined" ? localStorage.getItem("simulated_user_id") : null;
+    const rawUser = typeof window !== "undefined" ? localStorage.getItem("system_user") : null;
     let user = SYSTEM_USERS[1];
-    if (savedId) {
+
+    if (rawUser) {
+      try {
+        const parsed = JSON.parse(rawUser);
+        if (parsed && (!savedId || parsed.id === savedId)) {
+          user = parsed;
+        }
+      } catch (e) {}
+    }
+
+    if (savedId && user.id !== savedId) {
       const found = SYSTEM_USERS.find((u) => u.id === savedId);
       if (found) user = found;
     }
@@ -27,11 +38,15 @@ export function SimplifiedPortal() {
       const forms = await fetchAuthorizedCatalogWorkflowsAction(user.id);
       if (forms && forms.length > 0) {
         setWorkflows(forms);
+      } else {
+        setWorkflows([]);
       }
 
       const reqRes = await fetchMyRequestsAction(user.id);
       if (reqRes?.requests) {
         setMyRequests(reqRes.requests);
+      } else {
+        setMyRequests([]);
       }
     } catch (err) {
       console.error(err);
@@ -44,7 +59,11 @@ export function SimplifiedPortal() {
     loadPortalData();
     const handleSwitch = () => loadPortalData();
     window.addEventListener("user-simulated-switch", handleSwitch);
-    return () => window.removeEventListener("user-simulated-switch", handleSwitch);
+    window.addEventListener("system_user_changed", handleSwitch);
+    return () => {
+      window.removeEventListener("user-simulated-switch", handleSwitch);
+      window.removeEventListener("system_user_changed", handleSwitch);
+    };
   }, [lang]);
 
   const categoriesMap = workflows.reduce((acc, wf) => {

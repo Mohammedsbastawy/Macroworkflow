@@ -15,6 +15,16 @@ export function MobileBottomNav() {
   useEffect(() => {
     const loadUser = () => {
       const savedId = safeStorage.getItem("simulated_user_id");
+      const rawUser = safeStorage.getItem("system_user");
+      if (rawUser) {
+        try {
+          const parsed = JSON.parse(rawUser);
+          if (parsed && (!savedId || parsed.id === savedId)) {
+            setCurrentUser(parsed);
+            return;
+          }
+        } catch (e) {}
+      }
       if (savedId) {
         const found = SYSTEM_USERS.find((u) => u.id === savedId);
         if (found) setCurrentUser(found);
@@ -22,7 +32,11 @@ export function MobileBottomNav() {
     };
     loadUser();
     window.addEventListener("user-simulated-switch", loadUser);
-    return () => window.removeEventListener("user-simulated-switch", loadUser);
+    window.addEventListener("system_user_changed", loadUser);
+    return () => {
+      window.removeEventListener("user-simulated-switch", loadUser);
+      window.removeEventListener("system_user_changed", loadUser);
+    };
   }, []);
 
   const navItems = [
