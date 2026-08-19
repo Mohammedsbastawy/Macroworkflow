@@ -492,6 +492,12 @@ export async function saveWorkflowCanvasGraphAction(payload: {
     id: existingWf?.id,
     slug: payload.workflowSlug,
     name: existingWf?.name || payload.workflowSlug,
+    category: existingWf?.category,
+    description: existingWf?.description,
+    icon: existingWf?.icon,
+    color: existingWf?.color,
+    fields: existingWf?.fields || (existingWf as any)?.fields_json,
+    visibility_rules: existingWf?.visibility_rules || (existingWf as any)?.visibility_rules_json,
     react_flow_graph_json: graphJson as any,
     steps: stepRows as any,
     version: payload.version || existingWf?.version || 1,
@@ -499,6 +505,7 @@ export async function saveWorkflowCanvasGraphAction(payload: {
   });
 
   revalidatePath('/workflows');
+  revalidatePath('/workflows/form-builder');
   revalidatePath(`/admin/builder/${payload.workflowSlug}`);
   return { success: true, stepsCount: stepRows.length };
 }

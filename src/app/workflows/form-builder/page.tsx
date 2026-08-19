@@ -367,6 +367,7 @@ function FormBuilderInner() {
   });
 
   // Form Metadata
+  const [loadedSlug, setLoadedSlug] = useState<string>("");
   const [formTitle, setFormTitle] = useState(lang === "ar" ? "استمارة خدمة جديدة" : "New Service Form");
   const [formCategory, setFormCategory] = useState("Expenses & Allowances");
   const [formDescription, setFormDescription] = useState(
@@ -482,6 +483,7 @@ function FormBuilderInner() {
       fetchCatalogWorkflowsAction().then(list => {
         const found = list.find((w: any) => w.id === editId || w.slug === editId);
         if (found) {
+          setLoadedSlug(found.slug || found.id || editId);
           setFormTitle(found.name || "");
           setFormCategory(found.category || "General");
           setFormDescription(found.description || "");
@@ -1577,6 +1579,27 @@ function FormBuilderInner() {
       )}
 
       {/* ── TAB 2: APPROVAL WORKFLOW STEP BUILDER ── */}
+      {activeTab === "workflow" && (
+        <div style={{ flex: 1, position: "relative", minHeight: "calc(100vh - 120px)", display: "flex", flexDirection: "column" }}>
+          <div style={{ padding: "10px 20px", background: "var(--color-surface)", borderBottom: "1px solid var(--color-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-primary)" }}>
+                ⚡ {lang === "ar" ? "مصمم مسار الموافقات والشروط (Visual Approval Canvas)" : "Visual Approval Workflow Canvas"}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                {lang === "ar" ? "اسحب وأفلت خطوات الاعتماد، الشروط الذكية، والإشعارات لربطها بهذه الاستمارة." : "Drag & drop approval steps, conditional gates, and webhooks linked to this form."}
+              </div>
+            </div>
+            <span className="badge info">
+              {lang === "ar" ? "متزامن مع الاستمارة" : "Synced with Form"}
+            </span>
+          </div>
+          <div style={{ flex: 1, position: "relative", minHeight: "calc(100vh - 180px)" }}>
+            <WorkflowCanvas workflowSlug={loadedSlug || editId || `wf-${formTitle.toLowerCase().replace(/[^a-z0-9]/g, "-") || "custom"}`} />
+          </div>
+        </div>
+      )}
+
       {/* ── TAB 3: FULL INTERACTIVE TICKET PAGE PREVIEW & PANEL DESIGNER ── */}
       {activeTab === "ticket_panel" && (
         <div style={{ flex: 1, padding: 24, overflowY: "auto", display: "flex", flexDirection: "column", gap: 20 }}>

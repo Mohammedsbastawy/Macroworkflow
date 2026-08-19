@@ -69,19 +69,19 @@ export async function saveWorkflowTemplate(
   // Helper to merge existing record with update payload safely without wiping fields/steps
   const buildUpdatePayload = (existingRecord: any) => {
     return {
-      WorkflowName: templateData.name || existingRecord.WorkflowName || 'Workflow',
-      WorkflowSlug: slug || existingRecord.WorkflowSlug,
-      Category: templateData.category || existingRecord.Category || 'General',
-      Description: templateData.description !== undefined ? templateData.description : existingRecord.Description,
-      Icon: templateData.icon || existingRecord.Icon || '⚡',
-      Color: templateData.color || existingRecord.Color || '#4F46E5',
-      Version: templateData.version || existingRecord.Version || 1,
-      PublishedVersion: templateData.published_version || existingRecord.PublishedVersion || 1,
-      SlaTotalHours: templateData.sla_total_hours || existingRecord.SlaTotalHours || 48,
-      ReactFlowGraphJson: passedGraph !== undefined ? passedGraph : (existingRecord.ReactFlowGraphJson || null),
-      VisibilityRulesJson: passedVis !== undefined ? passedVis : (existingRecord.VisibilityRulesJson || null),
-      StepsJson: passedSteps !== undefined ? passedSteps : (existingRecord.StepsJson || []),
-      FieldsJson: passedFields !== undefined ? passedFields : (existingRecord.FieldsJson || []),
+      WorkflowName: templateData.name || existingRecord.WorkflowName || existingRecord.name || 'Workflow',
+      WorkflowSlug: slug || existingRecord.WorkflowSlug || existingRecord.slug,
+      Category: templateData.category || existingRecord.Category || existingRecord.category || 'General',
+      Description: templateData.description !== undefined ? templateData.description : (existingRecord.Description ?? existingRecord.description),
+      Icon: templateData.icon || existingRecord.Icon || existingRecord.icon || '⚡',
+      Color: templateData.color || existingRecord.Color || existingRecord.color || '#4F46E5',
+      Version: templateData.version || existingRecord.Version || existingRecord.version || 1,
+      PublishedVersion: templateData.published_version || existingRecord.PublishedVersion || existingRecord.published_version || 1,
+      SlaTotalHours: templateData.sla_total_hours || existingRecord.SlaTotalHours || existingRecord.sla_total_hours || 48,
+      ReactFlowGraphJson: passedGraph !== undefined ? passedGraph : (existingRecord.ReactFlowGraphJson || existingRecord.react_flow_graph_json || null),
+      VisibilityRulesJson: passedVis !== undefined ? passedVis : (existingRecord.VisibilityRulesJson || existingRecord.visibility_rules_json || existingRecord.visibility_rules || null),
+      StepsJson: passedSteps !== undefined ? passedSteps : (existingRecord.StepsJson || existingRecord.steps_json || existingRecord.steps || []),
+      FieldsJson: passedFields !== undefined ? passedFields : (existingRecord.FieldsJson || existingRecord.fields_json || existingRecord.fields || []),
       DateUpdated: new Date().toISOString(),
     };
   };
