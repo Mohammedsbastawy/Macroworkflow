@@ -58,6 +58,10 @@ export interface ExtendedFormField {
   defaultValue?: string;
   optionsList?: string[];
   optionsSource?: string;
+  // Submission Form vs Ticket Detail View Placement
+  showInRequestForm?: boolean;
+  showInTicketView?: boolean;
+  ticketOnly?: boolean;
   // Placement Zone & API Integration Binding
   ticketZone?: "main" | "sidebar" | "header" | "hidden";
   api_integration_id?: string;
@@ -540,7 +544,12 @@ function FormBuilderInner() {
   };
 
   // Add Field
-  const addField = (item: typeof TOOLBOX_ITEMS[0], targetZone: "main" | "sidebar" = "main", targetSectionId?: string) => {
+  const addField = (
+    item: typeof TOOLBOX_ITEMS[0], 
+    targetZone: "main" | "sidebar" = "main", 
+    targetSectionId?: string,
+    isTicketOnly?: boolean
+  ) => {
     let presetOptions: string[] = [];
     if (item.type === "select") {
       presetOptions = [lang === "ar" ? "خيار 1" : "Option 1", lang === "ar" ? "خيار 2" : "Option 2"];
@@ -554,6 +563,10 @@ function FormBuilderInner() {
 
     const assignedSection = targetZone === "sidebar" ? "sidebar" : (targetSectionId || activeTargetSectionId || customSections[0]?.id || "main_details");
 
+    const ticketOnlyFlag = isTicketOnly !== undefined 
+      ? isTicketOnly 
+      : (activeTab === "ticket_panel" || targetZone === "sidebar" || item.type === "api_panel" || item.type === "display_panel");
+
     const newField: ExtendedFormField = {
       id: `f-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       label: item.label.split("(")[0].trim(),
@@ -562,8 +575,11 @@ function FormBuilderInner() {
       ticketZone: targetZone,
       visibility_scope: "all",
       section: assignedSection,
+      showInRequestForm: !ticketOnlyFlag,
+      showInTicketView: true,
+      ticketOnly: ticketOnlyFlag,
       width: item.type === "textarea" || item.type === "transportation_route" || item.type === "section_header" || item.type === "info_notice" || item.type === "display_panel" || item.type === "api_panel" ? "full" : "half",
-      required: true,
+      required: !ticketOnlyFlag,
       readOnly: false,
       placeholder: item.type === "select" || item.type.startsWith("glpi_") ? (lang === "ar" ? "اختر من القائمة..." : "Select option...") : (lang === "ar" ? "أدخل البيانات هنا..." : "Enter details..."),
       optionsList: presetOptions,
@@ -688,20 +704,23 @@ function FormBuilderInner() {
             <button
               className={`btn btn-sm ${activeTab === "fields" ? "btn-primary" : "btn-ghost"}`}
               onClick={() => setActiveTab("fields")}
+              title={lang === "ar" ? "الحقول التي يملؤها مقدم الطلب عند إنشاء التكت في البداية" : "Fields filled by requester when creating the request"}
             >
-              🎨 {lang === "ar" ? `تصميم الحقول (${fields.length})` : `Form Fields (${fields.length})`}
+              📝 {lang === "ar" ? `استمارة تقديم الطلب (${fields.filter(f => f.showInRequestForm !== false && !f.ticketOnly && f.ticketZone !== "sidebar").length})` : `Request Submission Form (${fields.filter(f => f.showInRequestForm !== false && !f.ticketOnly && f.ticketZone !== "sidebar").length})`}
             </button>
             <button
               className={`btn btn-sm ${activeTab === "workflow" ? "btn-primary" : "btn-ghost"}`}
               onClick={() => setActiveTab("workflow")}
+              title={lang === "ar" ? "مسار الموافقات والاعتمادات والشروط" : "Approval Steps & Conditionals"}
             >
               ⚡ {lang === "ar" ? "مسار الاعتماد والشروط" : "Approval Workflow"}
             </button>
             <button
               className={`btn btn-sm ${activeTab === "ticket_panel" ? "btn-primary" : "btn-ghost"}`}
               onClick={() => setActiveTab("ticket_panel")}
+              title={lang === "ar" ? "تخصيص شكل صفحة المعاملة بعد إنشائها (البوكسات، الصلاحيات، تكاملات أوراكل، واللوحة الجانبية)" : "Design post-creation ticket view, custom review boxes, permissions, and Oracle panels"}
             >
-              📊 {lang === "ar" ? "تخصيص لوحة المعاملة" : "Ticket Info Panel"}
+              🖥️ {lang === "ar" ? `صفحة عرض المعاملة والمراجعة (${fields.length})` : `Ticket View & Review Page (${fields.length})`}
             </button>
             <button
               className={`btn btn-sm ${activeTab === "preview" ? "btn-primary" : "btn-ghost"}`}
@@ -929,72 +948,71 @@ function FormBuilderInner() {
               </div>
             </div>
 
-            {/* Fields List */}
-            {fields.length === 0 ? (
-              <div style={{ padding: 60, textAlign: "center", border: "2px dashed var(--color-border)", borderRadius: 12, background: "var(--color-surface)" }}>
-                <div style={{ fontSize: 40, marginBottom: 10 }}>🎨</div>
-                <div style={{ fontWeight: 800, fontSize: 16 }}>
-                  {lang === "ar" ? "الاستمارة فارغة حتى الآن" : "The Form is Empty"}
-                </div>
-                <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4 }}>
-                  {lang === "ar" 
-                    ? "اضغط على أي حقل من القائمة لإضافته هنا وبناء الاستمارة بسهولة." 
-                    : "Click any field from the palette to add it and build your form."}
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
-                {fields.map((field, idx) => {
-                  const isSelected = editingField?.id === field.id;
-                  const isFull = field.width === "full" || field.type === "transportation_route" || field.type === "section_header" || field.type === "info_notice";
+            {/* Fields List for Request Submission Form */}
+            {(() => {
+              const requestFormFields = fields.filter(f => f.showInRequestForm !== false && !f.ticketOnly && f.ticketZone !== "sidebar");
+              
+              if (requestFormFields.length === 0) {
+                return (
+                  <div style={{ padding: 60, textAlign: "center", border: "2px dashed var(--color-border)", borderRadius: 12, background: "var(--color-surface)" }}>
+                    <div style={{ fontSize: 40, marginBottom: 10 }}>📝</div>
+                    <div style={{ fontWeight: 800, fontSize: 16 }}>
+                      {lang === "ar" ? "استمارة تقديم الطلب فارغة حتى الآن" : "The Submission Form is Empty"}
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4 }}>
+                      {lang === "ar" 
+                        ? "اضغط على أي حقل من القائمة الجانبية لإضافته هنا إلى الاستمارة التي يملؤها الموظف عند طلب الخدمة." 
+                        : "Click any field from the palette to add it to the request form filled by employees."}
+                    </div>
+                  </div>
+                );
+              }
 
-                  return (
-                    <div
-                      key={field.id}
-                      onClick={() => setEditingField(field)}
-                      style={{
-                        gridColumn: isFull ? "span 2" : "span 1",
-                        background: isSelected ? "var(--color-primary-light)" : "var(--color-surface)",
-                        border: isSelected ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
-                        borderRadius: 10,
-                        padding: 14,
-                        cursor: "pointer",
-                        position: "relative",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      {/* Action buttons */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <div style={{ fontSize: 11, fontWeight: 800, color: "var(--color-primary)", display: "flex", alignItems: "center", gap: 6 }}>
-                          <span>#{idx + 1} {field.label} {field.required && <span style={{ color: "red" }}>*</span>}</span>
-                          {field.ticketZone === "sidebar" && (
-                            <span className="badge warning" style={{ fontSize: 9 }}>📊 Sidebar</span>
-                          )}
-                          {field.ticketZone === "header" && (
-                            <span className="badge info" style={{ fontSize: 9 }}>📌 Header</span>
-                          )}
-                          {field.type === "api_panel" && (
-                            <span className="badge success" style={{ fontSize: 9 }}>🔗 API Widget</span>
-                          )}
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+                  {requestFormFields.map((field, rIdx) => {
+                    const isSelected = editingField?.id === field.id;
+                    const isFull = field.width === "full" || field.type === "transportation_route" || field.type === "section_header" || field.type === "info_notice";
+                    const realIdx = fields.findIndex(f => f.id === field.id);
+
+                    return (
+                      <div
+                        key={field.id}
+                        onClick={() => setEditingField(field)}
+                        style={{
+                          gridColumn: isFull ? "span 2" : "span 1",
+                          background: isSelected ? "var(--color-primary-light)" : "var(--color-surface)",
+                          border: isSelected ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
+                          borderRadius: 10,
+                          padding: 14,
+                          cursor: "pointer",
+                          position: "relative",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        {/* Action buttons */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                          <div style={{ fontSize: 11, fontWeight: 800, color: "var(--color-primary)", display: "flex", alignItems: "center", gap: 6 }}>
+                            <span>#{rIdx + 1} {field.label} {field.required && <span style={{ color: "red" }}>*</span>}</span>
+                          </div>
+                          <div style={{ display: "flex", gap: 4 }}>
+                            <button
+                              className="btn btn-outline btn-xs"
+                              onClick={(e) => { e.stopPropagation(); moveField(realIdx, "up"); }}
+                              disabled={rIdx === 0}
+                            >▲</button>
+                            <button
+                              className="btn btn-outline btn-xs"
+                              onClick={(e) => { e.stopPropagation(); moveField(realIdx, "down"); }}
+                              disabled={rIdx === requestFormFields.length - 1}
+                            >▼</button>
+                            <button
+                              className="btn btn-outline btn-xs"
+                              style={{ color: "var(--color-danger)" }}
+                              onClick={(e) => { e.stopPropagation(); deleteField(field.id); }}
+                            >🗑</button>
+                          </div>
                         </div>
-                        <div style={{ display: "flex", gap: 4 }}>
-                          <button
-                            className="btn btn-outline btn-xs"
-                            onClick={(e) => { e.stopPropagation(); moveField(idx, "up"); }}
-                            disabled={idx === 0}
-                          >▲</button>
-                          <button
-                            className="btn btn-outline btn-xs"
-                            onClick={(e) => { e.stopPropagation(); moveField(idx, "down"); }}
-                            disabled={idx === fields.length - 1}
-                          >▼</button>
-                          <button
-                            className="btn btn-outline btn-xs"
-                            style={{ color: "var(--color-danger)" }}
-                            onClick={(e) => { e.stopPropagation(); deleteField(field.id); }}
-                          >🗑</button>
-                        </div>
-                      </div>
 
                       {/* Live Field Preview */}
                       {(field.type === "display_panel" || field.type === "api_panel") && (
@@ -1067,7 +1085,8 @@ function FormBuilderInner() {
                   );
                 })}
               </div>
-            )}
+            );
+          })()}
           </div>
 
           {/* EDITING PANEL */}
@@ -1182,7 +1201,32 @@ function FormBuilderInner() {
                       </select>
                     </div>
 
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, marginTop: 6 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "8px 12px", background: "var(--color-bg)", borderRadius: 6, border: "1px solid var(--color-border)", marginTop: 4 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: "var(--color-primary)" }}>
+                        👁️ {lang === "ar" ? "مراحل وأماكن ظهور الحقل:" : "Field Visibility Stages:"}
+                      </div>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
+                        <input
+                          type="checkbox"
+                          checked={editingField.showInRequestForm !== false && !editingField.ticketOnly}
+                          onChange={e => updateEditingField({ 
+                            showInRequestForm: e.target.checked,
+                            ticketOnly: !e.target.checked
+                          })}
+                        />
+                        📝 {lang === "ar" ? "يظهر في استمارة تقديم الطلب التي يملؤها الموظف (/requests/new)" : "Show in Request Submission Form"}
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
+                        <input
+                          type="checkbox"
+                          checked={editingField.showInTicketView !== false}
+                          onChange={e => updateEditingField({ showInTicketView: e.target.checked })}
+                        />
+                        🖥️ {lang === "ar" ? "يظهر في صفحة عرض ومراجعة المعاملة بعد إنشائها (/requests/[id])" : "Show in Post-Creation Ticket View"}
+                      </label>
+                    </div>
+
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, marginTop: 4 }}>
                       <input
                         type="checkbox"
                         checked={editingField.required}
@@ -1991,6 +2035,33 @@ function FormBuilderInner() {
                                       {field.label}
                                     </div>
                                     <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
+                                      {/* Toggle Request Form vs Ticket Only */}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const willShow = field.showInRequestForm === false || field.ticketOnly === true;
+                                          updateFieldById(field.id, {
+                                            showInRequestForm: willShow,
+                                            ticketOnly: !willShow,
+                                          });
+                                        }}
+                                        style={{
+                                          padding: "2px 6px",
+                                          fontSize: 9,
+                                          fontWeight: 800,
+                                          borderRadius: 4,
+                                          border: (field.showInRequestForm !== false && !field.ticketOnly) ? "1px solid #BBF7D0" : "1px solid #E2E8F0",
+                                          background: (field.showInRequestForm !== false && !field.ticketOnly) ? "#F0FDF4" : "#F8FAFC",
+                                          color: (field.showInRequestForm !== false && !field.ticketOnly) ? "#15803D" : "#64748B",
+                                          cursor: "pointer",
+                                        }}
+                                        title={lang === "ar" ? "تحديد ما إذا كان هذا الحقل سيظهر للموظف أثناء تقديم الطلب أيضاً أم خاص بصفحة المعاملة فقط" : "Toggle whether field appears in submission form or ticket review only"}
+                                      >
+                                        {(field.showInRequestForm !== false && !field.ticketOnly) 
+                                          ? (lang === "ar" ? "📝 في الاستمارة" : "📝 In Form") 
+                                          : (lang === "ar" ? "🔒 للمعاملة فقط" : "🔒 Ticket Only")}
+                                      </button>
+
                                       {/* Move to another Section Dropdown */}
                                       {customSections.length > 1 && (
                                         <select

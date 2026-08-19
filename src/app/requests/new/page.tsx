@@ -268,9 +268,19 @@ function NewRequestInner() {
                   <span className="section-heading-icon">📋</span> Request Details ({selectedWf?.name})
                 </div>
 
-                {/* Dynamic Form Fields Only */}
-                {(selectedWf?.fields || []).length > 0 ? (
-                  (selectedWf.fields as any[]).map((field) => (
+                {/* Dynamic Form Fields for Initial Submission Only */}
+                {(() => {
+                  const submissionFields = ((selectedWf?.fields || []) as any[]).filter(
+                    (f) => f.showInRequestForm !== false && !f.ticketOnly && f.ticketZone !== "sidebar"
+                  );
+                  if (submissionFields.length === 0) {
+                    return (
+                      <div style={{ padding: 24, textAlign: "center", color: "var(--color-text-muted)", fontSize: 13 }}>
+                        No submission fields configured for this request.
+                      </div>
+                    );
+                  }
+                  return submissionFields.map((field) => (
                     <div className="form-group" key={field.id || field.key}>
                       <label className="form-label">
                         {field.label} {field.required && <span className="required">*</span>}
@@ -360,19 +370,8 @@ function NewRequestInner() {
                         />
                       )}
                     </div>
-                  ))
-                ) : (
-                  <div className="form-group">
-                    <label className="form-label">Request Details</label>
-                    <textarea
-                      className="form-control"
-                      rows={4}
-                      placeholder="Describe your request..."
-                      value={formData["description"] || ""}
-                      onChange={(e) => handleInputChange("description", e.target.value)}
-                    />
-                  </div>
-                )}
+                  ));
+                })()}
               </div>
             </div>
           </div>
