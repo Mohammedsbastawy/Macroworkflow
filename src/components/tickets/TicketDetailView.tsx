@@ -1608,12 +1608,6 @@ export function TicketDetailView({
               </div>
             );
           })()}
-
-          {/* External API Integrations Panel */}
-          <ExternalIntegrationsPanel 
-            currentUserId={currentUser.id} 
-            currentUserRole={currentUser.role} 
-          />
         </div>
       </div>
 

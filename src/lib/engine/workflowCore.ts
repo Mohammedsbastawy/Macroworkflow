@@ -723,7 +723,10 @@ export async function getRequests(
     // Fetch EAV values for this ticket
     const vals = await dbGet('TicketValues', { TicketID: { _eq: req.id } });
     valuesMap[req.id] = vals.reduce((acc: Record<string, any>, curr: any) => {
-      acc[curr.FieldKey] = curr.ValueNumber != null ? curr.ValueNumber : curr.ValueText;
+      const fieldKey = curr.field_key || curr.FieldKey;
+      if (fieldKey) {
+        acc[fieldKey] = curr.value_number != null ? curr.value_number : (curr.value_text != null ? curr.value_text : curr.ValueText);
+      }
       return acc;
     }, {});
 
@@ -799,14 +802,18 @@ export async function getRequestById(
   }
 
   // Get EAV values
-  const vals = await dbGet('TicketValues', { TicketID: { _eq: ticket.TicketID } });
+  const realTicketId = ticket.id || ticket.TicketID || id;
+  const vals = await dbGet('TicketValues', { TicketID: { _eq: realTicketId } });
   const values = vals.reduce((acc: Record<string, any>, curr: any) => {
-    acc[curr.FieldKey] = curr.ValueNumber != null ? curr.ValueNumber : curr.ValueText;
+    const fieldKey = curr.field_key || curr.FieldKey;
+    if (fieldKey) {
+      acc[fieldKey] = curr.value_number != null ? curr.value_number : (curr.value_text != null ? curr.value_text : curr.ValueText);
+    }
     return acc;
   }, {});
 
   // Get approval logs
-  const logRows = await dbGet('ApprovalLog', { TicketID: { _eq: ticket.TicketID } }, 'DecisionAt');
+  const logRows = await dbGet('ApprovalLog', { TicketID: { _eq: realTicketId } }, 'DecisionAt');
   const logs = logRows.map(normalizeApprovalLog);
 
   // Check for SLA/OLA breaches and log them if they haven't been logged yet

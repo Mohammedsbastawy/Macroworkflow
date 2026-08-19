@@ -258,11 +258,11 @@ function NewRequestInner() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <div style={{ maxWidth: 840, margin: "0 auto" }}>
+      <form onSubmit={handleSubmit} style={{ paddingBottom: 120 }}>
+        <div style={{ maxWidth: 840, margin: "0 auto 40px auto" }}>
           {/* Main Form Fields */}
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <div className="card">
+            <div className="card" style={{ marginBottom: 20 }}>
               <div className="card-body">
                 <div className="section-heading">
                   <span className="section-heading-icon">📋</span> Request Details ({selectedWf?.name})

@@ -673,6 +673,541 @@ function FormBuilderInner() {
     }
   };
 
+  {/* ── HELPER: FIELD EDITOR PANEL (Shared between Tab 1 and Tab 3) ── */}
+  const renderFieldEditorPanel = (showEmptyState: boolean = true) => {
+    if (!editingField) {
+      if (!showEmptyState) return null;
+      return (
+        <div style={{ padding: 30, textAlign: "center", color: "var(--color-text-muted)" }}>
+          {lang === "ar" ? "اضغط على أي حقل في الشاشة لتعديل خصائصه هنا." : "Click any field in canvas to edit properties."}
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--color-border)", paddingBottom: 8 }}>
+          <div style={{ fontWeight: 800, fontSize: 13 }}>
+            ⚙️ {lang === "ar" ? `إعدادات الحقل: ${editingField.label}` : `Field Settings: ${editingField.label}`}
+          </div>
+          <button className="btn btn-outline btn-xs" onClick={() => setEditingField(null)}>✕</button>
+        </div>
+
+        {/* Sub-tabs */}
+        <div style={{ display: "flex", gap: 3, background: "var(--color-bg)", padding: 3, borderRadius: 6, flexWrap: "wrap" }}>
+          <button
+            className={`btn btn-xs ${fieldEditorTab === "basic" ? "btn-primary" : "btn-ghost"}`}
+            onClick={() => setFieldEditorTab("basic")}
+            style={{ flex: 1, minWidth: 55 }}
+          >
+            {lang === "ar" ? "الأساسية" : "Basic"}
+          </button>
+          {editingField.type === "select" && (
+            <button
+              className={`btn btn-xs ${fieldEditorTab === "options" ? "btn-primary" : "btn-ghost"}`}
+              onClick={() => setFieldEditorTab("options")}
+              style={{ flex: 1, minWidth: 55 }}
+            >
+              {lang === "ar" ? "الخيارات" : "Options"}
+            </button>
+          )}
+          <button
+            className={`btn btn-xs ${fieldEditorTab === "api" ? "btn-primary" : "btn-ghost"}`}
+            onClick={() => setFieldEditorTab("api")}
+            style={{ flex: 1, minWidth: 55 }}
+          >
+            🔗 {lang === "ar" ? "الـ API" : "API"}
+          </button>
+          <button
+            className={`btn btn-xs ${fieldEditorTab === "access" ? "btn-primary" : "btn-ghost"}`}
+            onClick={() => setFieldEditorTab("access")}
+            style={{ flex: 1, minWidth: 55 }}
+          >
+            🔒 {lang === "ar" ? "الصلاحية" : "Access"}
+          </button>
+          <button
+            className={`btn btn-xs ${fieldEditorTab === "advanced" ? "btn-primary" : "btn-ghost"}`}
+            onClick={() => setFieldEditorTab("advanced")}
+            style={{ flex: 1, minWidth: 55 }}
+          >
+            ⚙️ {lang === "ar" ? "متقدم" : "Advanced"}
+          </button>
+        </div>
+
+        {/* TAB 1: BASIC SETTINGS */}
+        {fieldEditorTab === "basic" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, display: "block", marginBottom: 4 }}>
+                {lang === "ar" ? "عنوان الحقل (Label) *" : "Field Label *"}
+              </label>
+              <input
+                className="form-control"
+                style={{ fontSize: 12 }}
+                value={editingField.label}
+                onChange={e => updateEditingField({ label: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, display: "block", marginBottom: 4 }}>
+                {lang === "ar" ? "التسمية التوضيحية (Placeholder)" : "Placeholder Text"}
+              </label>
+              <input
+                className="form-control"
+                style={{ fontSize: 12 }}
+                value={editingField.placeholder || ""}
+                onChange={e => updateEditingField({ placeholder: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, display: "block", marginBottom: 4 }}>
+                {lang === "ar" ? "عرض الحقل في الشاشة" : "Field Layout Width"}
+              </label>
+              <select
+                className="form-control"
+                style={{ fontSize: 12 }}
+                value={editingField.width}
+                onChange={e => updateEditingField({ width: e.target.value as any })}
+              >
+                <option value="half">{lang === "ar" ? "نصف صف (2 حقل بالسطر)" : "Half Width (2 per row)"}</option>
+                <option value="full">{lang === "ar" ? "سطر كامل (Full Row)" : "Full Width (1 per row)"}</option>
+              </select>
+            </div>
+
+            {/* Placement Zone Selector */}
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 800, color: "var(--color-primary)", display: "block", marginBottom: 4 }}>
+                📍 {lang === "ar" ? "مكان إظهار الحقل (Placement Zone)" : "Placement Zone"}
+              </label>
+              <select
+                className="form-control"
+                style={{ fontSize: 12, fontWeight: 700, borderColor: "var(--color-primary)" }}
+                value={editingField.ticketZone || "main"}
+                onChange={e => updateEditingField({ ticketZone: e.target.value as any })}
+              >
+                <option value="main">🎨 {lang === "ar" ? "تفاصيل النموذج الرئيسية (Main Form Details)" : "Main Form Details"}</option>
+                <option value="sidebar">📊 {lang === "ar" ? "القائمة الجانبية للتذكرة (Ticket Info Panel)" : "Ticket Info Panel (Sidebar)"}</option>
+                <option value="header">📌 {lang === "ar" ? "شريط هيدر التذكرة (Header Banner)" : "Header Banner"}</option>
+                <option value="hidden">🔒 {lang === "ar" ? "مخفي للمنطق فقط (Hidden)" : "Hidden"}</option>
+              </select>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "8px 12px", background: "var(--color-bg)", borderRadius: 6, border: "1px solid var(--color-border)", marginTop: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "var(--color-primary)" }}>
+                👁️ {lang === "ar" ? "مراحل وأماكن ظهور الحقل:" : "Field Visibility Stages:"}
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
+                <input
+                  type="checkbox"
+                  checked={editingField.showInRequestForm !== false && !editingField.ticketOnly}
+                  onChange={e => updateEditingField({ 
+                    showInRequestForm: e.target.checked,
+                    ticketOnly: !e.target.checked
+                  })}
+                />
+                📝 {lang === "ar" ? "يظهر في استمارة تقديم الطلب التي يملؤها الموظف (/requests/new)" : "Show in Request Submission Form"}
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
+                <input
+                  type="checkbox"
+                  checked={editingField.showInTicketView !== false}
+                  onChange={e => updateEditingField({ showInTicketView: e.target.checked })}
+                />
+                🖥️ {lang === "ar" ? "يظهر في صفحة عرض ومراجعة المعاملة بعد إنشائها (/requests/[id])" : "Show in Post-Creation Ticket View"}
+              </label>
+            </div>
+
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, marginTop: 4 }}>
+              <input
+                type="checkbox"
+                checked={editingField.required}
+                onChange={e => updateEditingField({ required: e.target.checked })}
+              />
+              {lang === "ar" ? "حقل إجباري (Required Field)" : "Required Field"}
+            </label>
+          </div>
+        )}
+
+        {/* TAB: API INTEGRATION BINDING */}
+        {fieldEditorTab === "api" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {editingField.type === "display_panel" || editingField.type === "api_panel" ? (
+              <div style={{ background: "#EFF6FF", padding: 12, borderRadius: 8, border: "1px solid #BFDBFE", display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#1E40AF" }}>
+                  📦 {lang === "ar" ? "إعدادات استدعاء الصنف (Oracle Settings)" : "Oracle Item Fetcher Settings"}
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: "#1E40AF", display: "block", marginBottom: 2 }}>
+                    {lang === "ar" ? "اختر نظام الـ API المستهدف:" : "Select Target API Integration:"}
+                  </label>
+                  <select
+                    className="form-control"
+                    style={{ fontSize: 11 }}
+                    value={editingField.api_integration_id || ""}
+                    onChange={e => updateEditingField({ api_integration_id: e.target.value })}
+                  >
+                    <option value="">-- {lang === "ar" ? "اختر نظام التكامل" : "Select Active API Integration"} --</option>
+
+                    <optgroup label={lang === "ar" ? "🔌 الأنظمة العامة (System Integrations)" : "🔌 System Integrations"}>
+                      {apiIntegrationsList.map((api: any) => (
+                        <option key={api.id} value={api.id}>
+                          🔌 {api.name} ({api.provider})
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: "#1E40AF", display: "block", marginBottom: 2 }}>
+                    {lang === "ar" ? "تصفية نوع الملكية (Ownership Filter):" : "Ownership Filter:"}
+                  </label>
+                  <select
+                    className="form-control"
+                    style={{ fontSize: 11, fontWeight: 600 }}
+                    value={editingField.oracle_ownership_filter || "all"}
+                    onChange={e => updateEditingField({ oracle_ownership_filter: e.target.value })}
+                  >
+                    <option value="all">{lang === "ar" ? "🌐 كل الملكيات (All - Owned & Consigned)" : "All (Owned & Consigned)"}</option>
+                    <option value="owned">{lang === "ar" ? "🏢 مملوك فقط (Owned Only)" : "Owned Only"}</option>
+                    <option value="consigned">{lang === "ar" ? "🤝 أمانة / موردين فقط (Consigned Only)" : "Consigned Only"}</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: "#1E40AF", display: "block", marginBottom: 4 }}>
+                    {lang === "ar" ? "الأعمدة المراد عرضها في جدول الأرصدة:" : "Visible Stock Table Columns:"}
+                  </label>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 5, background: "#fff", padding: 8, borderRadius: 6, border: "1px solid #BFDBFE", maxHeight: 180, overflowY: "auto" }}>
+                    {ORACLE_AVAILABLE_COLUMNS.map(col => {
+                      const currentCols = editingField.oracle_columns || DEFAULT_ORACLE_COLUMNS;
+                      const isChecked = currentCols.includes(col.id);
+                      return (
+                        <label key={col.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              let updated: string[];
+                              if (e.target.checked) {
+                                updated = [...currentCols, col.id];
+                              } else {
+                                updated = currentCols.filter((c: string) => c !== col.id);
+                              }
+                              updateEditingField({ oracle_columns: updated });
+                            }}
+                          />
+                          <span style={{ fontWeight: isChecked ? 700 : 400, color: isChecked ? "#1E40AF" : "inherit" }}>
+                            {lang === "ar" ? col.labelAr : col.labelEn}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: "#1E40AF", display: "block", marginBottom: 2 }}>
+                    {lang === "ar" ? "عنوان حقل البحث المدمج (Search Field Label):" : "Integrated Search Field Label:"}
+                  </label>
+                  <input
+                    className="form-control"
+                    style={{ fontSize: 11 }}
+                    value={editingField.api_search_label || ""}
+                    onChange={e => updateEditingField({ api_search_label: e.target.value })}
+                    placeholder={lang === "ar" ? "أدخل كود/رقم الصنف..." : "e.g. Enter item code..."}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: "#1E40AF", display: "block", marginBottom: 2 }}>
+                    {lang === "ar" ? "نص زر التشغيل والبحث (Action Button Text):" : "Action Button Text:"}
+                  </label>
+                  <input
+                    className="form-control"
+                    style={{ fontSize: 11, fontWeight: 700 }}
+                    value={editingField.api_button_text || ""}
+                    onChange={e => updateEditingField({ api_button_text: e.target.value })}
+                    placeholder="Go ➔"
+                  />
+                </div>
+
+                <div style={{ fontSize: 10, color: "#3B82F6", padding: 8, background: "#DBEAFE", borderRadius: 6, border: "1px solid #BFDBFE", fontWeight: 700 }}>
+                  💡 {lang === "ar" 
+                    ? "هذا المربع مدمج بالكامل: يحتوي على خانة إدخال، زر Go، ومربع عرض التجهيز الفوري للـ GET API دون الحاجة لربطه بخانات خارجية."
+                    : "Self-contained widget: includes search input, Go button, and live GET API results panel."}
+                </div>
+              </div>
+            ) : (
+              <div style={{ background: "#F0FDF4", padding: 12, borderRadius: 8, border: "1px solid #BBF7D0", display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#166534" }}>
+                  🔗 {lang === "ar" ? "تفعيل الحقل كمُدخل للـ API (API Input Binding)" : "API Input Field Binding"}
+                </div>
+
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
+                  <input
+                    type="checkbox"
+                    checked={editingField.api_input_enabled || false}
+                    onChange={e => updateEditingField({ api_input_enabled: e.target.checked })}
+                  />
+                  {lang === "ar" ? "ربط هذا الحقل بـ API واستخدامه كـ Parameter" : "Enable API binding for this input field"}
+                </label>
+
+                {editingField.api_input_enabled && (
+                  <div style={{ marginTop: 4 }}>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: "#166534", display: "block", marginBottom: 2 }}>
+                      {lang === "ar" ? "اختر الـ API الذي سيتلقى قيمة هذا الحقل:" : "Target API Integration:"}
+                    </label>
+                    <select
+                      className="form-control"
+                      style={{ fontSize: 11 }}
+                      value={editingField.api_input_integration_id || ""}
+                      onChange={e => updateEditingField({ api_input_integration_id: e.target.value })}
+                    >
+                      <option value="">-- {lang === "ar" ? "اختر الـ API أو الـ Endpoint" : "Select Target API"} --</option>
+                      
+                      {apiEndpointsList.length > 0 && (
+                        <optgroup label={lang === "ar" ? "📍 الـ Endpoints والعمليات المحددة" : "📍 Configured Endpoints"}>
+                          {apiEndpointsList.map((ep: any) => (
+                            <option key={ep.id} value={ep.id}>
+                              ⚡ [{ep.http_method}] {ep.integration_name ? `${ep.integration_name} → ` : ""}{ep.name} ({ep.path})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+
+                      <optgroup label={lang === "ar" ? "🔌 الأنظمة العامة (System Integrations)" : "🔌 System Integrations"}>
+                        {apiIntegrationsList.map((api: any) => (
+                          <option key={api.id} value={api.id}>
+                            🔌 {api.name} ({api.provider})
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB: FIELD ACCESS CONTROL & VISIBILITY */}
+        {fieldEditorTab === "access" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: "var(--color-primary)" }}>
+              🔒 {lang === "ar" ? "صلاحية مشاهدة واستخدام الحقل (Field Access Control)" : "Field Level Access Control"}
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11 }}>
+                <input
+                  type="radio"
+                  name={`fieldVis_${editingField.id}`}
+                  checked={editingField.visibility_scope !== "custom"}
+                  onChange={() => updateEditingField({ visibility_scope: "all" })}
+                />
+                🌐 {lang === "ar" ? "متاح للجميع (All Users)" : "Available to All Users"}
+              </label>
+
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11 }}>
+                <input
+                  type="radio"
+                  name={`fieldVis_${editingField.id}`}
+                  checked={editingField.visibility_scope === "custom"}
+                  onChange={() => updateEditingField({ visibility_scope: "custom" })}
+                />
+                🔒 {lang === "ar" ? "تخصيص صلاحيات لـ مجموعات / أقسام / أشخاص محددين" : "Specific Groups, Departments, or Users"}
+              </label>
+            </div>
+
+            {editingField.visibility_scope === "custom" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4, background: "var(--color-bg)", padding: 10, borderRadius: 8, border: "1px solid var(--color-border)" }}>
+                {/* Groups */}
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 800, display: "block", marginBottom: 4 }}>
+                    👥 {lang === "ar" ? "مجموعات العمل المسموح لها:" : "Target Groups:"}
+                  </label>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 100, overflowY: "auto", fontSize: 11 }}>
+                    {businessGroups.map(g => (
+                      <label key={g.id} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={(editingField.visible_group_ids || []).includes(g.id)}
+                          onChange={e => {
+                            const current = editingField.visible_group_ids || [];
+                            const updated = e.target.checked
+                              ? [...current, g.id]
+                              : current.filter(id => id !== g.id);
+                            updateEditingField({ visible_group_ids: updated });
+                          }}
+                        />
+                        {g.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Departments */}
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 800, display: "block", marginBottom: 4 }}>
+                    🏢 {lang === "ar" ? "الأقسام المسموح لها:" : "Target Departments:"}
+                  </label>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 100, overflowY: "auto", fontSize: 11 }}>
+                    {departments.map(d => (
+                      <label key={d.id} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={(editingField.visible_dept_ids || []).includes(d.id)}
+                          onChange={e => {
+                            const current = editingField.visible_dept_ids || [];
+                            const updated = e.target.checked
+                              ? [...current, d.id]
+                              : current.filter(id => id !== d.id);
+                            updateEditingField({ visible_dept_ids: updated });
+                          }}
+                        />
+                        {d.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Users */}
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 800, display: "block", marginBottom: 4 }}>
+                    👤 {lang === "ar" ? "أشخاص محددون:" : "Specific Users:"}
+                  </label>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 100, overflowY: "auto", fontSize: 11 }}>
+                    {users.map(u => (
+                      <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={(editingField.visible_user_ids || []).includes(u.id)}
+                          onChange={e => {
+                            const current = editingField.visible_user_ids || [];
+                            const updated = e.target.checked
+                              ? [...current, u.id]
+                              : current.filter(id => id !== u.id);
+                            updateEditingField({ visible_user_ids: updated });
+                          }}
+                        />
+                        {u.name} ({u.role})
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 2: DROPDOWN OPTIONS */}
+        {fieldEditorTab === "options" && editingField.type === "select" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <label style={{ fontSize: 11, fontWeight: 700 }}>
+              {lang === "ar" ? "اكتب الخيارات (كل خيار بسطر منفصل):" : "Enter Options (one option per line):"}
+            </label>
+            <textarea
+              className="form-control"
+              rows={6}
+              style={{ fontSize: 12, direction: lang === "ar" ? "rtl" : "ltr" }}
+              value={(editingField.optionsList || []).join("\n")}
+              onChange={e => updateEditingField({ optionsList: e.target.value.split("\n").filter(Boolean) })}
+            />
+          </div>
+        )}
+
+        {/* TAB 3: ADVANCED SETTINGS */}
+        {fieldEditorTab === "advanced" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, display: "block", marginBottom: 4 }}>
+                {lang === "ar" ? "التعبئة التلقائية (Auto-Fill Variable)" : "Auto-Fill Variable"}
+              </label>
+              <select
+                className="form-control"
+                style={{ fontSize: 12 }}
+                value={editingField.autoFillVariable || "none"}
+                onChange={e => updateEditingField({ autoFillVariable: e.target.value as any })}
+              >
+                <option value="none">{lang === "ar" ? "بدون تعبئة تلقائية" : "None"}</option>
+                <option value="user_name">{lang === "ar" ? "اسم الموظف المقدم للطلب" : "Requester Full Name"}</option>
+                <option value="user_email">{lang === "ar" ? "البريد الإلكتروني للموظف" : "Requester Email"}</option>
+                <option value="user_dept">{lang === "ar" ? "اسم الإدارة / القطاع" : "Department Name"}</option>
+                <option value="user_job">{lang === "ar" ? "المسمى الوظيفي للموظف" : "Job Title"}</option>
+                <option value="current_date">{lang === "ar" ? "تاريخ اليوم الحقيقي" : "Current Date"}</option>
+              </select>
+            </div>
+
+            {editingField.type === "number" && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700 }}>{lang === "ar" ? "أدنى قيمة (Min)" : "Min Value"}</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    style={{ fontSize: 11 }}
+                    value={editingField.minNumber || ""}
+                    onChange={e => updateEditingField({ minNumber: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700 }}>{lang === "ar" ? "أقصى قيمة (Max)" : "Max Value"}</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    style={{ fontSize: 11 }}
+                    value={editingField.maxNumber || ""}
+                    onChange={e => updateEditingField({ maxNumber: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+            )}
+
+            {editingField.type === "transportation_route" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, borderTop: "1px dashed var(--color-border)", paddingTop: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 800 }}>📏 {lang === "ar" ? "سقوف المصاريف لكل بند (بالجنية المصري)" : "Per-Item Expense Limits (EGP)"}</div>
+                <div style={{ fontSize: 10, color: "var(--color-text-muted)" }}>
+                  {lang === "ar"
+                    ? "اترك الخانة فارغة لعدم وجود سقف. عند تجاوز الموظف للسقف يظهر تنبيه بأنه تجاوز الحد المسموح دون كشف قيمته."
+                    : "Leave blank for no limit. When an employee exceeds a limit, a warning appears without revealing its value."}
+                </div>
+                {[
+                  { key: "meal", label: "🍔 وجبات" },
+                  { key: "coffee", label: "☕ قهوة" },
+                  { key: "parking", label: "🅿️ باركينج" },
+                  { key: "correspondence", label: "✉️ مراسلات" },
+                  { key: "ticketCost", label: "🎟️ تذكرة سفر" },
+                ].map(cfg => (
+                  <div key={cfg.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ width: 150, fontSize: 11, fontWeight: 700 }}>{cfg.label} (ج.م)</span>
+                    <input
+                      type="number"
+                      className="form-control"
+                      style={{ fontSize: 12 }}
+                      placeholder={lang === "ar" ? "بدون سقف" : "No limit"}
+                      value={editingField.travelLimits?.[cfg.key as keyof TravelLimits] ?? ""}
+                      onChange={e => {
+                        const v = e.target.value;
+                        const next = { ...(editingField.travelLimits || {}) } as TravelLimits;
+                        if (v === "") delete next[cfg.key as keyof TravelLimits];
+                        else next[cfg.key as keyof TravelLimits] = Number(v);
+                        updateEditingField({ travelLimits: next });
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 60px)", background: "var(--color-bg)", direction: lang === "ar" ? "rtl" : "ltr", textAlign: lang === "ar" ? "right" : "left" }}>
       
@@ -1091,532 +1626,7 @@ function FormBuilderInner() {
 
           {/* EDITING PANEL */}
           <div style={{ background: "var(--color-surface)", borderRight: lang === "ar" ? "1px solid var(--color-border)" : "none", borderLeft: lang === "ar" ? "none" : "1px solid var(--color-border)", padding: 16, overflowY: "auto" }}>
-            {editingField ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--color-border)", paddingBottom: 8 }}>
-                  <div style={{ fontWeight: 800, fontSize: 13 }}>
-                    ⚙️ {lang === "ar" ? `إعدادات الحقل: ${editingField.label}` : `Field Settings: ${editingField.label}`}
-                  </div>
-                  <button className="btn btn-outline btn-xs" onClick={() => setEditingField(null)}>✕</button>
-                </div>
-
-                {/* Sub-tabs */}
-                <div style={{ display: "flex", gap: 3, background: "var(--color-bg)", padding: 3, borderRadius: 6, flexWrap: "wrap" }}>
-                  <button
-                    className={`btn btn-xs ${fieldEditorTab === "basic" ? "btn-primary" : "btn-ghost"}`}
-                    onClick={() => setFieldEditorTab("basic")}
-                    style={{ flex: 1, minWidth: 55 }}
-                  >
-                    {lang === "ar" ? "الأساسية" : "Basic"}
-                  </button>
-                  {editingField.type === "select" && (
-                    <button
-                      className={`btn btn-xs ${fieldEditorTab === "options" ? "btn-primary" : "btn-ghost"}`}
-                      onClick={() => setFieldEditorTab("options")}
-                      style={{ flex: 1, minWidth: 55 }}
-                    >
-                      {lang === "ar" ? "الخيارات" : "Options"}
-                    </button>
-                  )}
-                  <button
-                    className={`btn btn-xs ${fieldEditorTab === "api" ? "btn-primary" : "btn-ghost"}`}
-                    onClick={() => setFieldEditorTab("api")}
-                    style={{ flex: 1, minWidth: 55 }}
-                  >
-                    🔗 {lang === "ar" ? "الـ API" : "API"}
-                  </button>
-                  <button
-                    className={`btn btn-xs ${fieldEditorTab === "access" ? "btn-primary" : "btn-ghost"}`}
-                    onClick={() => setFieldEditorTab("access")}
-                    style={{ flex: 1, minWidth: 55 }}
-                  >
-                    🔒 {lang === "ar" ? "الصلاحية" : "Access"}
-                  </button>
-                  <button
-                    className={`btn btn-xs ${fieldEditorTab === "advanced" ? "btn-primary" : "btn-ghost"}`}
-                    onClick={() => setFieldEditorTab("advanced")}
-                    style={{ flex: 1, minWidth: 55 }}
-                  >
-                    ⚙️ {lang === "ar" ? "متقدم" : "Advanced"}
-                  </button>
-                </div>
-
-                {/* TAB 1: BASIC SETTINGS */}
-                {fieldEditorTab === "basic" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 700, display: "block", marginBottom: 4 }}>
-                        {lang === "ar" ? "عنوان الحقل (Label) *" : "Field Label *"}
-                      </label>
-                      <input
-                        className="form-control"
-                        style={{ fontSize: 12 }}
-                        value={editingField.label}
-                        onChange={e => updateEditingField({ label: e.target.value })}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 700, display: "block", marginBottom: 4 }}>
-                        {lang === "ar" ? "التسمية التوضيحية (Placeholder)" : "Placeholder Text"}
-                      </label>
-                      <input
-                        className="form-control"
-                        style={{ fontSize: 12 }}
-                        value={editingField.placeholder || ""}
-                        onChange={e => updateEditingField({ placeholder: e.target.value })}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 700, display: "block", marginBottom: 4 }}>
-                        {lang === "ar" ? "عرض الحقل في الشاشة" : "Field Layout Width"}
-                      </label>
-                      <select
-                        className="form-control"
-                        style={{ fontSize: 12 }}
-                        value={editingField.width}
-                        onChange={e => updateEditingField({ width: e.target.value as any })}
-                      >
-                        <option value="half">{lang === "ar" ? "نصف صف (2 حقل بالسطر)" : "Half Width (2 per row)"}</option>
-                        <option value="full">{lang === "ar" ? "سطر كامل (Full Row)" : "Full Width (1 per row)"}</option>
-                      </select>
-                    </div>
-
-                    {/* Placement Zone Selector */}
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 800, color: "var(--color-primary)", display: "block", marginBottom: 4 }}>
-                        📍 {lang === "ar" ? "مكان إظهار الحقل (Placement Zone)" : "Placement Zone"}
-                      </label>
-                      <select
-                        className="form-control"
-                        style={{ fontSize: 12, fontWeight: 700, borderColor: "var(--color-primary)" }}
-                        value={editingField.ticketZone || "main"}
-                        onChange={e => updateEditingField({ ticketZone: e.target.value as any })}
-                      >
-                        <option value="main">🎨 {lang === "ar" ? "تفاصيل النموذج الرئيسية (Main Form Details)" : "Main Form Details"}</option>
-                        <option value="sidebar">📊 {lang === "ar" ? "القائمة الجانبية للتذكرة (Ticket Info Panel)" : "Ticket Info Panel (Sidebar)"}</option>
-                        <option value="header">📌 {lang === "ar" ? "شريط هيدر التذكرة (Header Banner)" : "Header Banner"}</option>
-                        <option value="hidden">🔒 {lang === "ar" ? "مخفي للمنطق فقط (Hidden)" : "Hidden"}</option>
-                      </select>
-                    </div>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "8px 12px", background: "var(--color-bg)", borderRadius: 6, border: "1px solid var(--color-border)", marginTop: 4 }}>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: "var(--color-primary)" }}>
-                        👁️ {lang === "ar" ? "مراحل وأماكن ظهور الحقل:" : "Field Visibility Stages:"}
-                      </div>
-                      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
-                        <input
-                          type="checkbox"
-                          checked={editingField.showInRequestForm !== false && !editingField.ticketOnly}
-                          onChange={e => updateEditingField({ 
-                            showInRequestForm: e.target.checked,
-                            ticketOnly: !e.target.checked
-                          })}
-                        />
-                        📝 {lang === "ar" ? "يظهر في استمارة تقديم الطلب التي يملؤها الموظف (/requests/new)" : "Show in Request Submission Form"}
-                      </label>
-                      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
-                        <input
-                          type="checkbox"
-                          checked={editingField.showInTicketView !== false}
-                          onChange={e => updateEditingField({ showInTicketView: e.target.checked })}
-                        />
-                        🖥️ {lang === "ar" ? "يظهر في صفحة عرض ومراجعة المعاملة بعد إنشائها (/requests/[id])" : "Show in Post-Creation Ticket View"}
-                      </label>
-                    </div>
-
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, marginTop: 4 }}>
-                      <input
-                        type="checkbox"
-                        checked={editingField.required}
-                        onChange={e => updateEditingField({ required: e.target.checked })}
-                      />
-                      {lang === "ar" ? "حقل إجباري (Required Field)" : "Required Field"}
-                    </label>
-                  </div>
-                )}
-
-                {/* TAB: API INTEGRATION BINDING */}
-                {fieldEditorTab === "api" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {editingField.type === "display_panel" || editingField.type === "api_panel" ? (
-                      <div style={{ background: "#EFF6FF", padding: 12, borderRadius: 8, border: "1px solid #BFDBFE", display: "flex", flexDirection: "column", gap: 10 }}>
-                        <div style={{ fontSize: 11, fontWeight: 800, color: "#1E40AF" }}>
-                          📦 {lang === "ar" ? "إعدادات استدعاء الصنف (Oracle Settings)" : "Oracle Item Fetcher Settings"}
-                        </div>
-                        <div>
-                          <label style={{ fontSize: 10, fontWeight: 700, color: "#1E40AF", display: "block", marginBottom: 2 }}>
-                            {lang === "ar" ? "اختر نظام الـ API المستهدف:" : "Select Target API Integration:"}
-                          </label>
-                          <select
-                            className="form-control"
-                            style={{ fontSize: 11 }}
-                            value={editingField.api_integration_id || ""}
-                            onChange={e => updateEditingField({ api_integration_id: e.target.value })}
-                          >
-                            <option value="">-- {lang === "ar" ? "اختر نظام التكامل" : "Select Active API Integration"} --</option>
-
-                            <optgroup label={lang === "ar" ? "🔌 الأنظمة العامة (System Integrations)" : "🔌 System Integrations"}>
-                              {apiIntegrationsList.map((api: any) => (
-                                <option key={api.id} value={api.id}>
-                                  🔌 {api.name} ({api.provider})
-                                </option>
-                              ))}
-                            </optgroup>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label style={{ fontSize: 10, fontWeight: 700, color: "#1E40AF", display: "block", marginBottom: 2 }}>
-                            {lang === "ar" ? "تصفية نوع الملكية (Ownership Filter):" : "Ownership Filter:"}
-                          </label>
-                          <select
-                            className="form-control"
-                            style={{ fontSize: 11, fontWeight: 600 }}
-                            value={editingField.oracle_ownership_filter || "all"}
-                            onChange={e => updateEditingField({ oracle_ownership_filter: e.target.value })}
-                          >
-                            <option value="all">{lang === "ar" ? "🌐 كل الملكيات (All - Owned & Consigned)" : "All (Owned & Consigned)"}</option>
-                            <option value="owned">{lang === "ar" ? "🏢 مملوك فقط (Owned Only)" : "Owned Only"}</option>
-                            <option value="consigned">{lang === "ar" ? "🤝 أمانة / موردين فقط (Consigned Only)" : "Consigned Only"}</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label style={{ fontSize: 10, fontWeight: 700, color: "#1E40AF", display: "block", marginBottom: 4 }}>
-                            {lang === "ar" ? "الأعمدة المراد عرضها في جدول الأرصدة:" : "Visible Stock Table Columns:"}
-                          </label>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 5, background: "#fff", padding: 8, borderRadius: 6, border: "1px solid #BFDBFE", maxHeight: 180, overflowY: "auto" }}>
-                            {ORACLE_AVAILABLE_COLUMNS.map(col => {
-                              const currentCols = editingField.oracle_columns || DEFAULT_ORACLE_COLUMNS;
-                              const isChecked = currentCols.includes(col.id);
-                              return (
-                                <label key={col.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, cursor: "pointer" }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={(e) => {
-                                      let updated: string[];
-                                      if (e.target.checked) {
-                                        updated = [...currentCols, col.id];
-                                      } else {
-                                        updated = currentCols.filter((c: string) => c !== col.id);
-                                      }
-                                      updateEditingField({ oracle_columns: updated });
-                                    }}
-                                  />
-                                  <span style={{ fontWeight: isChecked ? 700 : 400, color: isChecked ? "#1E40AF" : "inherit" }}>
-                                    {lang === "ar" ? col.labelAr : col.labelEn}
-                                  </span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <div>
-                          <label style={{ fontSize: 10, fontWeight: 700, color: "#1E40AF", display: "block", marginBottom: 2 }}>
-                            {lang === "ar" ? "عنوان حقل البحث المدمج (Search Field Label):" : "Integrated Search Field Label:"}
-                          </label>
-                          <input
-                            className="form-control"
-                            style={{ fontSize: 11 }}
-                            value={editingField.api_search_label || ""}
-                            onChange={e => updateEditingField({ api_search_label: e.target.value })}
-                            placeholder={lang === "ar" ? "أدخل كود/رقم الصنف..." : "e.g. Enter item code..."}
-                          />
-                        </div>
-
-                        <div>
-                          <label style={{ fontSize: 10, fontWeight: 700, color: "#1E40AF", display: "block", marginBottom: 2 }}>
-                            {lang === "ar" ? "نص زر التشغيل والبحث (Action Button Text):" : "Action Button Text:"}
-                          </label>
-                          <input
-                            className="form-control"
-                            style={{ fontSize: 11, fontWeight: 700 }}
-                            value={editingField.api_button_text || ""}
-                            onChange={e => updateEditingField({ api_button_text: e.target.value })}
-                            placeholder="Go ➔"
-                          />
-                        </div>
-
-                        <div style={{ fontSize: 10, color: "#3B82F6", padding: 8, background: "#DBEAFE", borderRadius: 6, border: "1px solid #BFDBFE", fontWeight: 700 }}>
-                          💡 {lang === "ar" 
-                            ? "هذا المربع مدمج بالكامل: يحتوي على خانة إدخال، زر Go، ومربع عرض التجهيز الفوري للـ GET API دون الحاجة لربطه بخانات خارجية."
-                            : "Self-contained widget: includes search input, Go button, and live GET API results panel."}
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ background: "#F0FDF4", padding: 12, borderRadius: 8, border: "1px solid #BBF7D0", display: "flex", flexDirection: "column", gap: 10 }}>
-                        <div style={{ fontSize: 11, fontWeight: 800, color: "#166534" }}>
-                          🔗 {lang === "ar" ? "تفعيل الحقل كمُدخل للـ API (API Input Binding)" : "API Input Field Binding"}
-                        </div>
-
-                        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
-                          <input
-                            type="checkbox"
-                            checked={editingField.api_input_enabled || false}
-                            onChange={e => updateEditingField({ api_input_enabled: e.target.checked })}
-                          />
-                          {lang === "ar" ? "ربط هذا الحقل بـ API واستخدامه كـ Parameter" : "Enable API binding for this input field"}
-                        </label>
-
-                        {editingField.api_input_enabled && (
-                          <div style={{ marginTop: 4 }}>
-                            <label style={{ fontSize: 10, fontWeight: 700, color: "#166534", display: "block", marginBottom: 2 }}>
-                              {lang === "ar" ? "اختر الـ API الذي سيتلقى قيمة هذا الحقل:" : "Target API Integration:"}
-                            </label>
-                            <select
-                              className="form-control"
-                              style={{ fontSize: 11 }}
-                              value={editingField.api_input_integration_id || ""}
-                              onChange={e => updateEditingField({ api_input_integration_id: e.target.value })}
-                            >
-                              <option value="">-- {lang === "ar" ? "اختر الـ API أو الـ Endpoint" : "Select Target API"} --</option>
-                              
-                              {apiEndpointsList.length > 0 && (
-                                <optgroup label={lang === "ar" ? "📍 الـ Endpoints والعمليات المحددة" : "📍 Configured Endpoints"}>
-                                  {apiEndpointsList.map((ep: any) => (
-                                    <option key={ep.id} value={ep.id}>
-                                      ⚡ [{ep.http_method}] {ep.integration_name ? `${ep.integration_name} → ` : ""}{ep.name} ({ep.path})
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              )}
-
-                              <optgroup label={lang === "ar" ? "🔌 الأنظمة العامة (System Integrations)" : "🔌 System Integrations"}>
-                                {apiIntegrationsList.map((api: any) => (
-                                  <option key={api.id} value={api.id}>
-                                    🔌 {api.name} ({api.provider})
-                                  </option>
-                                ))}
-                              </optgroup>
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* TAB: FIELD ACCESS CONTROL & VISIBILITY */}
-                {fieldEditorTab === "access" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: "var(--color-primary)" }}>
-                      🔒 {lang === "ar" ? "صلاحية مشاهدة واستخدام الحقل (Field Access Control)" : "Field Level Access Control"}
-                    </div>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11 }}>
-                        <input
-                          type="radio"
-                          name={`fieldVis_${editingField.id}`}
-                          checked={editingField.visibility_scope !== "custom"}
-                          onChange={() => updateEditingField({ visibility_scope: "all" })}
-                        />
-                        🌐 {lang === "ar" ? "متاح للجميع (All Users)" : "Available to All Users"}
-                      </label>
-
-                      <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11 }}>
-                        <input
-                          type="radio"
-                          name={`fieldVis_${editingField.id}`}
-                          checked={editingField.visibility_scope === "custom"}
-                          onChange={() => updateEditingField({ visibility_scope: "custom" })}
-                        />
-                        🔒 {lang === "ar" ? "تخصيص صلاحيات لـ مجموعات / أقسام / أشخاص محددين" : "Specific Groups, Departments, or Users"}
-                      </label>
-                    </div>
-
-                    {editingField.visibility_scope === "custom" && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4, background: "var(--color-bg)", padding: 10, borderRadius: 8, border: "1px solid var(--color-border)" }}>
-                        {/* Groups */}
-                        <div>
-                          <label style={{ fontSize: 10, fontWeight: 800, display: "block", marginBottom: 4 }}>
-                            👥 {lang === "ar" ? "مجموعات العمل المسموح لها:" : "Target Groups:"}
-                          </label>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 100, overflowY: "auto", fontSize: 11 }}>
-                            {businessGroups.map(g => (
-                              <label key={g.id} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                                <input
-                                  type="checkbox"
-                                  checked={(editingField.visible_group_ids || []).includes(g.id)}
-                                  onChange={e => {
-                                    const current = editingField.visible_group_ids || [];
-                                    const updated = e.target.checked
-                                      ? [...current, g.id]
-                                      : current.filter(id => id !== g.id);
-                                    updateEditingField({ visible_group_ids: updated });
-                                  }}
-                                />
-                                {g.name}
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Departments */}
-                        <div>
-                          <label style={{ fontSize: 10, fontWeight: 800, display: "block", marginBottom: 4 }}>
-                            🏢 {lang === "ar" ? "الأقسام المسموح لها:" : "Target Departments:"}
-                          </label>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 100, overflowY: "auto", fontSize: 11 }}>
-                            {departments.map(d => (
-                              <label key={d.id} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                                <input
-                                  type="checkbox"
-                                  checked={(editingField.visible_dept_ids || []).includes(d.id)}
-                                  onChange={e => {
-                                    const current = editingField.visible_dept_ids || [];
-                                    const updated = e.target.checked
-                                      ? [...current, d.id]
-                                      : current.filter(id => id !== d.id);
-                                    updateEditingField({ visible_dept_ids: updated });
-                                  }}
-                                />
-                                {d.name}
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Users */}
-                        <div>
-                          <label style={{ fontSize: 10, fontWeight: 800, display: "block", marginBottom: 4 }}>
-                            👤 {lang === "ar" ? "أشخاص محددون:" : "Specific Users:"}
-                          </label>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 100, overflowY: "auto", fontSize: 11 }}>
-                            {users.map(u => (
-                              <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                                <input
-                                  type="checkbox"
-                                  checked={(editingField.visible_user_ids || []).includes(u.id)}
-                                  onChange={e => {
-                                    const current = editingField.visible_user_ids || [];
-                                    const updated = e.target.checked
-                                      ? [...current, u.id]
-                                      : current.filter(id => id !== u.id);
-                                    updateEditingField({ visible_user_ids: updated });
-                                  }}
-                                />
-                                {u.name} ({u.role})
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* TAB 2: DROPDOWN OPTIONS */}
-                {fieldEditorTab === "options" && editingField.type === "select" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    <label style={{ fontSize: 11, fontWeight: 700 }}>
-                      {lang === "ar" ? "اكتب الخيارات (كل خيار بسطر منفصل):" : "Enter Options (one option per line):"}
-                    </label>
-                    <textarea
-                      className="form-control"
-                      rows={6}
-                      style={{ fontSize: 12, direction: lang === "ar" ? "rtl" : "ltr" }}
-                      value={(editingField.optionsList || []).join("\n")}
-                      onChange={e => updateEditingField({ optionsList: e.target.value.split("\n").filter(Boolean) })}
-                    />
-                  </div>
-                )}
-
-                {/* TAB 3: ADVANCED SETTINGS */}
-                {fieldEditorTab === "advanced" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 700, display: "block", marginBottom: 4 }}>
-                        {lang === "ar" ? "التعبئة التلقائية (Auto-Fill Variable)" : "Auto-Fill Variable"}
-                      </label>
-                      <select
-                        className="form-control"
-                        style={{ fontSize: 12 }}
-                        value={editingField.autoFillVariable || "none"}
-                        onChange={e => updateEditingField({ autoFillVariable: e.target.value as any })}
-                      >
-                        <option value="none">{lang === "ar" ? "بدون تعبئة تلقائية" : "None"}</option>
-                        <option value="user_name">{lang === "ar" ? "اسم الموظف المقدم للطلب" : "Requester Full Name"}</option>
-                        <option value="user_email">{lang === "ar" ? "البريد الإلكتروني للموظف" : "Requester Email"}</option>
-                        <option value="user_dept">{lang === "ar" ? "اسم الإدارة / القطاع" : "Department Name"}</option>
-                        <option value="user_job">{lang === "ar" ? "المسمى الوظيفي للموظف" : "Job Title"}</option>
-                        <option value="current_date">{lang === "ar" ? "تاريخ اليوم الحقيقي" : "Current Date"}</option>
-                      </select>
-                    </div>
-
-                    {editingField.type === "number" && (
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                        <div>
-                          <label style={{ fontSize: 10, fontWeight: 700 }}>{lang === "ar" ? "أدنى قيمة (Min)" : "Min Value"}</label>
-                          <input
-                            type="number"
-                            className="form-control"
-                            style={{ fontSize: 11 }}
-                            value={editingField.minNumber || ""}
-                            onChange={e => updateEditingField({ minNumber: Number(e.target.value) })}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: 10, fontWeight: 700 }}>{lang === "ar" ? "أقصى قيمة (Max)" : "Max Value"}</label>
-                          <input
-                            type="number"
-                            className="form-control"
-                            style={{ fontSize: 11 }}
-                            value={editingField.maxNumber || ""}
-                            onChange={e => updateEditingField({ maxNumber: Number(e.target.value) })}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {editingField.type === "transportation_route" && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8, borderTop: "1px dashed var(--color-border)", paddingTop: 12 }}>
-                        <div style={{ fontSize: 11, fontWeight: 800 }}>📏 {lang === "ar" ? "سقوف المصاريف لكل بند (بالجنية المصري)" : "Per-Item Expense Limits (EGP)"}</div>
-                        <div style={{ fontSize: 10, color: "var(--color-text-muted)" }}>
-                          {lang === "ar"
-                            ? "اترك الخانة فارغة لعدم وجود سقف. عند تجاوز الموظف للسقف يظهر تنبيه بأنه تجاوز الحد المسموح دون كشف قيمته."
-                            : "Leave blank for no limit. When an employee exceeds a limit, a warning appears without revealing its value."}
-                        </div>
-                        {[
-                          { key: "meal", label: "🍔 وجبات" },
-                          { key: "coffee", label: "☕ قهوة" },
-                          { key: "parking", label: "🅿️ باركينج" },
-                          { key: "correspondence", label: "✉️ مراسلات" },
-                          { key: "ticketCost", label: "🎟️ تذكرة سفر" },
-                        ].map(cfg => (
-                          <div key={cfg.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ width: 150, fontSize: 11, fontWeight: 700 }}>{cfg.label} (ج.م)</span>
-                            <input
-                              type="number"
-                              className="form-control"
-                              style={{ fontSize: 12 }}
-                              placeholder={lang === "ar" ? "بدون سقف" : "No limit"}
-                              value={editingField.travelLimits?.[cfg.key as keyof TravelLimits] ?? ""}
-                              onChange={e => {
-                                const v = e.target.value;
-                                const next = { ...(editingField.travelLimits || {}) } as TravelLimits;
-                                if (v === "") delete next[cfg.key as keyof TravelLimits];
-                                else next[cfg.key as keyof TravelLimits] = Number(v);
-                                updateEditingField({ travelLimits: next });
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-              </div>
-            ) : (
-              <div style={{ padding: 30, textAlign: "center", color: "var(--color-text-muted)" }}>
-                {lang === "ar" ? "اضغط على أي حقل في الشاشة الوسطى لتعديل خصائصه هنا." : "Click any field in canvas to edit properties."}
-              </div>
-            )}
+            {renderFieldEditorPanel(true)}
           </div>
 
         </div>
@@ -2570,6 +2580,22 @@ function FormBuilderInner() {
 
                   </div>
                 </div>
+
+                {/* 🛠️ Dynamic Field Settings Editor for Tab 3 (Opens right under Sidebar Panel on ✏️ Edit) */}
+                {editingField && (
+                  <div
+                    className="card"
+                    style={{
+                      padding: 16,
+                      border: "2px solid var(--color-primary)",
+                      background: "var(--color-surface)",
+                      boxShadow: "0 4px 14px rgba(79, 70, 229, 0.12)",
+                      borderRadius: 10,
+                    }}
+                  >
+                    {renderFieldEditorPanel(false)}
+                  </div>
+                )}
               </div>
 
             </div>
