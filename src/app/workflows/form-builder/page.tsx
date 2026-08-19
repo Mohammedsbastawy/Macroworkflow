@@ -364,7 +364,7 @@ function FormBuilderInner() {
     defaultUnit: "Brand Alpha - Retail",
     defaultAssignedGroup: "IT Support Group",
     defaultAssignedUser: "Khaled Samir (Manager)",
-    defaultObservers: "Ahmed Mohamed, Sara Hassan",
+    defaultObservers: "",
     defaultSlaTto: "1 Hour",
     defaultSlaTtr: "24 Hours",
     defaultTotalCost: "1,250.00 EGP",
@@ -2283,7 +2283,7 @@ function FormBuilderInner() {
                             setTempUnit(panelConfig.defaultUnit || "Brand Alpha - Retail");
                             setTempAssignedGroup(panelConfig.defaultAssignedGroup || "IT Support Group");
                             setTempAssignedUser(panelConfig.defaultAssignedUser || "Khaled Samir (Manager)");
-                            setTempObservers(panelConfig.defaultObservers ?? "Ahmed Mohamed, Sara Hassan");
+                            setTempObservers(panelConfig.defaultObservers ?? "");
                             const parsedTto = parseSlaString(panelConfig.defaultSlaTto || "1 Hour");
                             setTempSlaTtoValue(parsedTto.value);
                             setTempSlaTtoUnit(parsedTto.unit);

@@ -1412,12 +1412,14 @@ export function TicketDetailView({
                         </div>
                       )}
 
-                      <div style={{ paddingTop: 8, borderTop: '1px dashed var(--color-border)' }}>
-                        <div style={{ fontSize: 10, color: "var(--color-text-muted)", fontWeight: 700 }}>Observers / CC (المتابعين)</div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-primary)", marginTop: 2 }}>
-                          👁️ {request.observer_id || "Ahmed Mohamed, Sara Hassan"}
+                      {request.observer_id && request.observer_id.trim() !== "" && (
+                        <div style={{ paddingTop: 8, borderTop: '1px dashed var(--color-border)' }}>
+                          <div style={{ fontSize: 10, color: "var(--color-text-muted)", fontWeight: 700 }}>Observers / CC (المتابعين)</div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-primary)", marginTop: 2 }}>
+                            👁️ {request.observer_id}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* SECTION: Custom Form Fields Placed in Sidebar */}
                       {sidebarFields.length > 0 && (
