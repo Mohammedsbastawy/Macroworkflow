@@ -50,6 +50,7 @@ const NAV_ITEMS: NavGroup[] = [
       { href: "/admin/users", icon: "👥", labelEn: "Users & IAM", labelAr: "المستخدمين والصلاحيات", moduleKey: "usersIam" },
       { href: "/admin/profiles", icon: "🛡️", labelEn: "Profile Setup", labelAr: "إعدادات البروفايل", moduleKey: "profileSetup" },
       { href: "/admin/reports", icon: "📊", labelEn: "Reports & SLA", labelAr: "التقارير واتفاقيات الخدمة", moduleKey: "reportsSla" },
+      { href: "/admin/integrations", icon: "🔌", labelEn: "API Integrations", labelAr: "الربط مع الأنظمة الخارجية", moduleKey: "settings" },
       { href: "/admin/settings", icon: "⚙", labelEn: "Settings & Feature Flags", labelAr: "الإعدادات ومراقب النظام", moduleKey: "settings" },
     ],
   },

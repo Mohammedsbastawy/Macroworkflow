@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { Node, Edge } from '@xyflow/react';
-import { fetchBusinessRulesAction } from '@/app/actions/workflowActions';
+import { fetchBusinessRulesAction, fetchApiIntegrationsAction } from '@/app/actions/workflowActions';
 
 interface NodeConfigPanelProps {
   node: Node | null;
@@ -23,10 +23,15 @@ const MAGIC_VARIABLES = [
 export function NodeConfigPanel({ node, edge, onUpdateNodeData, onDeleteNode, onDeleteEdge }: NodeConfigPanelProps) {
   const [showVarPicker, setShowVarPicker] = useState<string | null>(null);
   const [businessRules, setBusinessRules] = useState<any[]>([]);
+  const [apiIntegrations, setApiIntegrations] = useState<any[]>([]);
 
   useEffect(() => {
     fetchBusinessRulesAction().then((rules) => {
       setBusinessRules(rules || []);
+    }).catch(console.error);
+
+    fetchApiIntegrationsAction().then((integrations) => {
+      setApiIntegrations(integrations || []);
     }).catch(console.error);
   }, []);
 
@@ -125,6 +130,184 @@ export function NodeConfigPanel({ node, edge, onUpdateNodeData, onDeleteNode, on
           Use <code>{`{{form.field}}`}</code> or <code>{`{{requester.manager}}`}</code> in any input field to bind dynamic values.
         </div>
       </div>
+
+      {/* Trigger & Form Nodes: Form Fields & API Integrations Manager */}
+      {Boolean(node.type && ['trigger', 'start', 'form'].includes(node.type)) && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed var(--color-border)', marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--color-primary)', textTransform: 'uppercase', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>🎨 Form Fields & API Integrations</span>
+            <span className="badge primary" style={{ fontSize: 9 }}>Form Builder</span>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-primary btn-sm btn-block"
+            style={{ fontSize: 11, fontWeight: 700, marginBottom: 12 }}
+            onClick={() => {
+              const currentFields = (data.fields as any[]) || [];
+              const newField = {
+                id: `field_${Date.now()}`,
+                key: `item_code_${currentFields.length + 1}`,
+                label: `New Field ${currentFields.length + 1}`,
+                type: 'text',
+                ticketZone: 'main',
+                required: false,
+              };
+              handleChange('fields', [...currentFields, newField]);
+            }}
+          >
+            ＋ Add Form Field / API Widget
+          </button>
+
+          {((data.fields as any[]) || []).length === 0 ? (
+            <div style={{ fontSize: 10, color: 'var(--color-text-muted)', textAlign: 'center', padding: 10, background: 'var(--color-bg)', borderRadius: 6 }}>
+              No custom fields added yet. Click &apos; Add Form Field &apos; to build form inputs & API widgets.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {((data.fields as any[]) || []).map((field: any, idx: number) => (
+                <div key={field.id || idx} style={{ background: 'var(--color-bg)', padding: 10, borderRadius: 8, border: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--color-primary)' }}>Field #{idx + 1}</span>
+                    <button
+                      type="button"
+                      style={{ background: 'none', border: 'none', color: '#EF4444', fontSize: 11, cursor: 'pointer', fontWeight: 700 }}
+                      onClick={() => {
+                        const currentFields = (data.fields as any[]) || [];
+                        const updated = currentFields.filter((_, i) => i !== idx);
+                        handleChange('fields', updated);
+                      }}
+                    >
+                      🗑 Delete
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div>
+                      <label style={{ fontSize: 9, color: 'var(--color-text-muted)', fontWeight: 700 }}>Label (اسم الخانة)</label>
+                      <input
+                        className="form-control"
+                        style={{ fontSize: 11, padding: '4px 8px' }}
+                        value={field.label || ''}
+                        onChange={(e) => {
+                          const currentFields = [...((data.fields as any[]) || [])];
+                          currentFields[idx] = { ...currentFields[idx], label: e.target.value };
+                          handleChange('fields', currentFields);
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      <div>
+                        <label style={{ fontSize: 9, color: 'var(--color-text-muted)', fontWeight: 700 }}>Key (مفتاح الخانة)</label>
+                        <input
+                          className="form-control"
+                          style={{ fontSize: 11, padding: '4px 8px', fontFamily: 'monospace' }}
+                          value={field.key || ''}
+                          onChange={(e) => {
+                            const currentFields = [...((data.fields as any[]) || [])];
+                            currentFields[idx] = { ...currentFields[idx], key: e.target.value };
+                            handleChange('fields', currentFields);
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: 9, color: 'var(--color-text-muted)', fontWeight: 700 }}>Type (نوع الخانة)</label>
+                        <select
+                          className="form-control"
+                          style={{ fontSize: 10, padding: '4px 6px', fontWeight: 700 }}
+                          value={field.type || 'text'}
+                          onChange={(e) => {
+                            const currentFields = [...((data.fields as any[]) || [])];
+                            currentFields[idx] = { ...currentFields[idx], type: e.target.value };
+                            handleChange('fields', currentFields);
+                          }}
+                        >
+                          <option value="text">✏️ Text Input</option>
+                          <option value="number">🔢 Number</option>
+                          <option value="select">▼ Dropdown</option>
+                          <option value="textarea">📝 Textarea</option>
+                          <option value="date">📅 Date</option>
+                          <option value="api_panel">🔗 Live API Display Widget</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 9, color: 'var(--color-primary)', fontWeight: 800 }}>
+                        📍 Placement Zone (مكان الظهور في التذكرة)
+                      </label>
+                      <select
+                        className="form-control"
+                        style={{ fontSize: 10, padding: '4px 6px', fontWeight: 800, borderColor: 'var(--color-primary)' }}
+                        value={field.ticketZone || 'main'}
+                        onChange={(e) => {
+                          const currentFields = [...((data.fields as any[]) || [])];
+                          currentFields[idx] = { ...currentFields[idx], ticketZone: e.target.value };
+                          handleChange('fields', currentFields);
+                        }}
+                      >
+                        <option value="main">🎨 Main Form Details (تفاصيل النموذج)</option>
+                        <option value="sidebar">📊 Ticket Info Panel (القائمة الجانبية)</option>
+                        <option value="header">📌 Header Banner (أعلى التذكرة)</option>
+                        <option value="hidden">🔒 Hidden (مخفي)</option>
+                      </select>
+                    </div>
+
+                    {/* API Integration binding settings */}
+                    {(field.type === 'api_panel' || field.api_integration_id) && (
+                      <div style={{ background: '#EFF6FF', padding: 8, borderRadius: 6, border: '1px solid #BFDBFE', marginTop: 4 }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, color: '#1E40AF', marginBottom: 4 }}>
+                          🔗 API Integration Binding (ربط بالـ API)
+                        </div>
+
+                        <div style={{ marginBottom: 4 }}>
+                          <label style={{ fontSize: 8, color: '#1E40AF', fontWeight: 700 }}>Select Target API</label>
+                          <select
+                            className="form-control"
+                            style={{ fontSize: 10, padding: '3px 6px' }}
+                            value={field.api_integration_id || ''}
+                            onChange={(e) => {
+                              const currentFields = [...((data.fields as any[]) || [])];
+                              currentFields[idx] = { ...currentFields[idx], api_integration_id: e.target.value };
+                              handleChange('fields', currentFields);
+                            }}
+                          >
+                            <option value="">-- Select Active API --</option>
+                            {apiIntegrations.map((api) => (
+                              <option key={api.id} value={api.id}>
+                                🔌 {api.name} ({api.provider})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {field.type === 'api_panel' && (
+                          <div>
+                            <label style={{ fontSize: 8, color: '#1E40AF', fontWeight: 700 }}>Bound Source Field Key</label>
+                            <input
+                              className="form-control"
+                              style={{ fontSize: 10, padding: '3px 6px', fontFamily: 'monospace' }}
+                              placeholder="e.g. item_code"
+                              value={field.bound_field_key || ''}
+                              onChange={(e) => {
+                                const currentFields = [...((data.fields as any[]) || [])];
+                                currentFields[idx] = { ...currentFields[idx], bound_field_key: e.target.value };
+                                handleChange('fields', currentFields);
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Human Approval Settings */}
       {node.type === 'approval' && (

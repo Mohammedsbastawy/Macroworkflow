@@ -98,9 +98,9 @@ export function NotificationBell({ currentUserId }: { currentUserId: string }) {
       es.onerror = () => {};
     }
 
-    // ── Reliable live polling (primary): every 3s.
+    // ── Reliable live polling (primary): every 15s.
     // Guarantees live updates even when SSE isn't shared across dev workers.
-    const FALLBACK_POLL_MS = 3000;
+    const FALLBACK_POLL_MS = 15000;
     const pollId = window.setInterval(() => {
       if (openRef.current) load();
       else refreshUnread();

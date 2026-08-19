@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { SYSTEM_USERS, SystemUser, DEFAULT_ROLE_PERMISSIONS, BUSINESS_GROUPS, DEPARTMENTS } from "@/lib/engine/iamStore";
+import { ExternalIntegrationsPanel } from "./ExternalIntegrationsPanel";
 
 export interface TicketDetailProps {
   requestId: string;
@@ -183,11 +184,71 @@ export function TicketDetailView({
   const schema = workflow?.form_schema || workflow || { fields: [] };
   const fields = workflow?.fields || workflow?.form_schema?.fields || schema.fields || [];
 
+  // Filter fields based on Field Level Access Control
+  const isFieldVisible = (f: any) => {
+    if (!f.visibility_scope || f.visibility_scope !== "custom") return true;
+    const userRole = currentUser.role || "";
+    const userId = currentUser.id || "";
+    const userDept = currentUser.department_id || (currentUser as any).department || "";
+
+    let hasMatch = false;
+    let customRulesSet = false;
+
+    if (f.visible_user_ids && f.visible_user_ids.length > 0) {
+      customRulesSet = true;
+      if (f.visible_user_ids.includes(userId)) hasMatch = true;
+    }
+    if (f.visible_group_ids && f.visible_group_ids.length > 0) {
+      customRulesSet = true;
+      if (f.visible_group_ids.includes(userRole)) hasMatch = true;
+    }
+    if (f.visible_dept_ids && f.visible_dept_ids.length > 0) {
+      customRulesSet = true;
+      if (f.visible_dept_ids.includes(userDept)) hasMatch = true;
+    }
+
+    if (customRulesSet && !hasMatch) return false;
+    return true;
+  };
+
+  const visibleFields = fields.filter(isFieldVisible);
+
   // Group fields by zone placement (set in Form Builder)
-  const headerFields = fields.filter((f: any) => f.ticketZone === "header");
-  const sidebarFields = fields.filter((f: any) => f.ticketZone === "sidebar");
-  const hiddenFieldsKeys = new Set(fields.filter((f: any) => f.ticketZone === "hidden").map((f: any) => f.key || f.id));
-  const mainFields = fields.filter((f: any) => !f.ticketZone || f.ticketZone === "details" || f.ticketZone === "main");
+  const headerFields = visibleFields.filter((f: any) => f.ticketZone === "header");
+  const sidebarFields = visibleFields.filter((f: any) => f.ticketZone === "sidebar");
+  const hiddenFieldsKeys = new Set(visibleFields.filter((f: any) => f.ticketZone === "hidden").map((f: any) => f.key || f.id));
+  const mainFields = visibleFields.filter((f: any) => !f.ticketZone || f.ticketZone === "details" || f.ticketZone === "main");
+
+  // Dynamic Custom Sections from Workflow
+  const rawCustomSections: any[] = workflow?.visibility_rules?.custom_sections || [];
+  
+  const isSectionVisible = (sec: any) => {
+    if (!sec.visibility_scope || sec.visibility_scope !== "custom") return true;
+    if (currentUser.role === "admin" || (currentUser.roles && currentUser.roles.includes("admin"))) return true;
+    
+    let hasMatch = false;
+    let customRulesSet = false;
+
+    if (sec.visible_user_ids && sec.visible_user_ids.length > 0) {
+      customRulesSet = true;
+      if (sec.visible_user_ids.includes(currentUser.id) || sec.visible_user_ids.includes(currentUser.name)) hasMatch = true;
+    }
+    if (sec.visible_group_ids && sec.visible_group_ids.length > 0) {
+      customRulesSet = true;
+      const userRole = currentUser.role || "";
+      if (sec.visible_group_ids.includes(userRole) || (currentUser.roles && currentUser.roles.some((r: string) => sec.visible_group_ids.includes(r)))) hasMatch = true;
+    }
+    if (sec.visible_dept_ids && sec.visible_dept_ids.length > 0) {
+      customRulesSet = true;
+      const userDept = (currentUser as any).department || (currentUser as any).dept_id || "";
+      if (sec.visible_dept_ids.includes(userDept)) hasMatch = true;
+    }
+
+    if (customRulesSet && !hasMatch) return false;
+    return true;
+  };
+
+  const visibleCustomSections = rawCustomSections.filter(isSectionVisible);
 
   // Merge activity timeline (ledger logs + local comments)
   useEffect(() => {
@@ -507,152 +568,239 @@ export function TicketDetailView({
       <div className="detail-grid" style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 20 }}>
         {/* ── LEFT COLUMN: MAIN FORM DATA + TIMELINE ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* Main Details Card */}
-          <div className="card">
-            <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div className="card-title">📝 Ticket Form Details</div>
-              <span className="tag">{mainFields.length} Form Fields</span>
-            </div>
-            <div className="card-body">
-              <div className="detail-fields" style={{ gap: 16 }}>
-                {/* Render fields configured as 'details' / main */}
-                {mainFields.length > 0 ? (
-                  mainFields.map((field: any) => {
-                    const key = field.key || field.id;
-                    let val = values?.[key];
-                    let parsedJson: any = null;
-                    if (typeof val === "object" && val !== null) {
-                      parsedJson = val;
-                    } else if (typeof val === "string" && (val.startsWith("{") || val.startsWith("["))) {
-                      try {
-                        parsedJson = JSON.parse(val);
-                      } catch (e) {}
-                    }
+          {/* Helper to render individual field item */}
+          {(() => {
+            const renderFieldItem = (field: any) => {
+              const key = field.key || field.id;
+              let val = values?.[key];
+              let parsedJson: any = null;
+              if (typeof val === "object" && val !== null) {
+                parsedJson = val;
+              } else if (typeof val === "string" && (val.startsWith("{") || val.startsWith("["))) {
+                try {
+                  parsedJson = JSON.parse(val);
+                } catch (e) {}
+              }
 
-                    // Fallback for transportation_route if values object has flat travel fields or summary
-                    if (field.type === "transportation_route" && !parsedJson && values) {
-                      parsedJson = {
-                        mode: "travel_package",
-                        fromZone: values.originZone || values.origin || "التجمع الخامس",
-                        toZone: values.destinationZone || values.destination || "الاسكندرية",
-                        fromDate: values.fromDate || "2026-08-01",
-                        toDate: values.toDate || "2026-08-02",
-                        isOvernight: values.isOvernight ?? true,
-                        isMeeting: values.isMeeting ?? true,
-                        calculatedCost: values.calculatedCost || 250,
-                        calculatedMeals: values.calculatedMeals || 150,
-                        parkingCost: values.parkingCost || 50,
-                        totalCost: values.totalCost || values.calculatedAllowance || 450,
-                      };
-                    }
+              // Fallback for transportation_route if values object has flat travel fields or summary
+              if (field.type === "transportation_route" && !parsedJson && values) {
+                parsedJson = {
+                  mode: "travel_package",
+                  fromZone: values.originZone || values.origin || "التجمع الخامس",
+                  toZone: values.destinationZone || values.destination || "الاسكندرية",
+                  fromDate: values.fromDate || "2026-08-01",
+                  toDate: values.toDate || "2026-08-02",
+                  isOvernight: values.isOvernight ?? true,
+                  isMeeting: values.isMeeting ?? true,
+                  calculatedCost: values.calculatedCost || 250,
+                  calculatedMeals: values.calculatedMeals || 150,
+                  parkingCost: values.parkingCost || 50,
+                  totalCost: values.totalCost || values.calculatedAllowance || 450,
+                };
+              }
 
-                    return (
-                      <div key={field.id} style={{ gridColumn: field.type === "textarea" || field.type === "transportation_route" ? "1 / -1" : "auto" }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", marginBottom: 4 }}>
-                          {field.label}
-                        </div>
-                        {field.type === "transportation_route" && parsedJson ? (
-                          <div style={{ padding: 16, background: "var(--color-bg)", borderRadius: 8, border: "1px solid var(--color-primary)" }}>
-                            {parsedJson.mode === "travel_package" ? (
-                              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                                <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-primary)", borderBottom: "1px solid var(--color-border)", paddingBottom: 6, marginBottom: 4 }}>
-                                  🚗 {isAr ? "تفاصيل السفر والانتقال المجمعة" : "Travel Route & Financial Package Breakdown"}
-                                </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 12 }}>
-                                  <div>📅 <strong>{isAr ? "الفترة:" : "Period:"}</strong> {isAr ? "من" : "from"} {parsedJson.fromDate} {parsedJson.isOvernight ? `${isAr ? "إلى" : "to"} ${parsedJson.toDate}` : ""}</div>
-                                  <div>🏨 <strong>{isAr ? "المبيت:" : "Overnight Stay:"}</strong> {parsedJson.isOvernight ? (isAr ? "نعم" : "Yes") : (isAr ? "لا" : "No")}</div>
-                                  <div>📍 <strong>{isAr ? "خط السير:" : "Route:"}</strong> {isAr ? "من" : "from"} <strong>[{parsedJson.fromZone}]</strong> {isAr ? "إلى" : "to"} <strong>[{parsedJson.toZone}]</strong></div>
-                                  <div>👥 <strong>{isAr ? "اجتماع عمل:" : "Business Meeting:"}</strong> {parsedJson.isMeeting ? (isAr ? "نعم" : "Yes") : (isAr ? "لا" : "No")}</div>
-                                </div>
-                                
-                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginTop: 8 }}>
-                                  <thead>
-                                    <tr style={{ background: "var(--color-surface)", borderBottom: "1px solid var(--color-border)" }}>
-                                      <th style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left", fontWeight: 700 }}>{isAr ? "البند" : "Expense Item"}</th>
-                                      <th style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{isAr ? "التكلفة" : "Amount"}</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>
-                                        🚗 {isAr ? "بدل الانتقال" : "Travel Allowance"} {parsedJson.hasTicket ? (isAr ? " (يدوي - تذكرة)" : " (Manual - Ticket)") : (isAr ? " (تلقائي - لائحة)" : " (Policy - Allowance)")}
-                                        {parsedJson.ticketFileId && (
-                                          <div style={{ fontSize: 11, marginTop: 4 }}>
-                                            📎 <a href={`/api/files/${parsedJson.ticketFileId}`} target="_blank" rel="noreferrer" style={{ color: "var(--color-primary)", textDecoration: "underline", fontWeight: 700 }}>{isAr ? "تحميل التذكرة المرفقة" : "Download Attached Ticket"}</a>
-                                          </div>
-                                        )}
-                                      </td>
-                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.calculatedCost || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
-                                    </tr>
-                                    <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>🍔 {isAr ? "الوجبات" : "Meals Allowance"}</td>
-                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.calculatedMeals ?? parsedJson.mealCost ?? 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
-                                    </tr>
-                                    <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>☕ {isAr ? "القهوة" : "Coffee"}</td>
-                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.coffeeCost || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
-                                    </tr>
-                                    <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>✉️ {isAr ? "المراسلات" : "Correspondence Cost"}</td>
-                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.correspondenceCost || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
-                                    </tr>
-                                    <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>🅿️ {isAr ? "الباركينج" : "Parking & Tolls"}</td>
-                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.parkingCost || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
-                                    </tr>
-                                    <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>👥 {isAr ? "مصاريف اجتماع فريق" : "Team Meeting Expenses"}</td>
-                                      <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.teamMeetingCost || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
-                                    </tr>
-                                    {parsedJson.additionalNotes && (
-                                      <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-                                        <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>📝 {isAr ? "ملاحظات إضافية:" : "Additional Notes:"}</td>
-                                        <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontStyle: "italic", fontWeight: 600 }}>{parsedJson.additionalNotes}</td>
-                                      </tr>
-                                    )}
-                                    {parsedJson.additionalAttachmentFileId && (
-                                      <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-                                        <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>📎 {isAr ? "مرفق إضافي:" : "Extra Attachment:"}</td>
-                                        <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right" }}>
-                                          <a href={`/api/files/${parsedJson.additionalAttachmentFileId}`} target="_blank" rel="noreferrer" style={{ color: "var(--color-primary)", textDecoration: "underline", fontWeight: 700 }}>
-                                            {parsedJson.additionalAttachmentFileName || (isAr ? "تحميل المرفق الإضافي" : "Download Attachment")}
-                                          </a>
-                                        </td>
-                                      </tr>
-                                    )}
-                                    <tr style={{ background: "#ECFDF5", borderTop: "2px solid #10B981" }}>
-                                      <td style={{ padding: "10px 10px", textAlign: isAr ? "right" : "left", fontWeight: 900, color: "#065F46" }}>💰 {isAr ? "الإجمالي المستحق (الصافي):" : "Grand Total:"}</td>
-                                      <td style={{ padding: "10px 10px", textAlign: isAr ? "left" : "right", fontWeight: 950, color: "#047857", fontSize: 14 }}>{Number(parsedJson.totalCost || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
-                                    </tr>
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : parsedJson.mode === "distance_km" ? (
-                              <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-primary)" }}>
-                                🚗 {isAr ? "احتساب الانتقال بالكيلومترات:" : "Distance Based Allowance:"} <strong>{parsedJson.distanceKm} {isAr ? "كم" : "km"}</strong> × <strong>{parsedJson.ratePerKm} {isAr ? "ج.م/كم" : "EGP/km"}</strong> = {isAr ? "إجمالي البدل" : "Total"} <strong style={{ color: "#10B981" }}>{parsedJson.calculatedAllowance?.toLocaleString()} {isAr ? "ج.م" : "EGP"}</strong>
-                              </div>
-                            ) : (
-                              <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-primary)" }}>
-                                📍 {isAr ? "خط السير:" : "Route:"} {isAr ? "من" : "from"} <strong>[{parsedJson.originZone}]</strong> {isAr ? "إلى" : "to"} <strong>[{parsedJson.destinationZone}]</strong> | {isAr ? "الوسيلة:" : "Method:"} {parsedJson.travelMethod} | {isAr ? "التكلفة:" : "Cost:"} <strong>{parsedJson.estimatedCost} {isAr ? "ج.م" : "EGP"}</strong>
-                              </div>
-                            )}
+              if (field.type === "display_panel" || field.type === "api_panel") {
+                const queryVal = field.bound_field_key ? values?.[field.bound_field_key] : val;
+                return (
+                  <div key={field.id} style={{ gridColumn: "1 / -1" }}>
+                    <ExternalIntegrationsPanel
+                      currentUserId={currentUser.id}
+                      currentUserRole={currentUser.role}
+                      targetApiId={field.api_integration_id}
+                      initialQuery={queryVal ? String(queryVal) : undefined}
+                      titleOverride={field.label}
+                      searchLabel={field.api_search_label}
+                      searchPlaceholder={field.placeholder}
+                      buttonText={field.api_button_text}
+                      visibleColumns={field.oracle_columns}
+                      ownershipFilter={field.oracle_ownership_filter}
+                    />
+                  </div>
+                );
+              }
+
+              return (
+                <div key={field.id} style={{ gridColumn: field.type === "textarea" || field.type === "transportation_route" ? "1 / -1" : "auto" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", marginBottom: 4 }}>
+                    {field.label}
+                  </div>
+                  {field.type === "transportation_route" && parsedJson ? (
+                    <div style={{ padding: 16, background: "var(--color-bg)", borderRadius: 8, border: "1px solid var(--color-primary)" }}>
+                      {parsedJson.mode === "travel_package" ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-primary)", borderBottom: "1px solid var(--color-border)", paddingBottom: 6, marginBottom: 4 }}>
+                            🚗 {isAr ? "تفاصيل السفر والانتقال المجمعة" : "Travel Route & Financial Package Breakdown"}
                           </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 12 }}>
+                            <div>📅 <strong>{isAr ? "الفترة:" : "Period:"}</strong> {isAr ? "من" : "from"} {parsedJson.fromDate} {parsedJson.isOvernight ? `${isAr ? "إلى" : "to"} ${parsedJson.toDate}` : ""}</div>
+                            <div>🏨 <strong>{isAr ? "المبيت:" : "Overnight Stay:"}</strong> {parsedJson.isOvernight ? (isAr ? "نعم" : "Yes") : (isAr ? "لا" : "No")}</div>
+                            <div>📍 <strong>{isAr ? "خط السير:" : "Route:"}</strong> {isAr ? "من" : "from"} <strong>[{parsedJson.fromZone}]</strong> {isAr ? "إلى" : "to"} <strong>[{parsedJson.toZone}]</strong></div>
+                            <div>👥 <strong>{isAr ? "اجتماع عمل:" : "Business Meeting:"}</strong> {parsedJson.isMeeting ? (isAr ? "نعم" : "Yes") : (isAr ? "لا" : "No")}</div>
+                          </div>
+                          
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginTop: 8 }}>
+                            <thead>
+                              <tr style={{ background: "var(--color-surface)", borderBottom: "1px solid var(--color-border)" }}>
+                                <th style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left", fontWeight: 700 }}>{isAr ? "البند" : "Expense Item"}</th>
+                                <th style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{isAr ? "التكلفة" : "Amount"}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                                <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>
+                                  🚗 {isAr ? "بدل الانتقال" : "Travel Allowance"} {parsedJson.hasTicket ? (isAr ? " (يدوي - تذكرة)" : " (Manual - Ticket)") : (isAr ? " (تلقائي - لائحة)" : " (Policy - Allowance)")}
+                                  {parsedJson.ticketFileId && (
+                                    <div style={{ fontSize: 11, marginTop: 4 }}>
+                                      📎 <a href={`/api/files/${parsedJson.ticketFileId}`} target="_blank" rel="noreferrer" style={{ color: "var(--color-primary)", textDecoration: "underline", fontWeight: 700 }}>{isAr ? "تحميل التذكرة المرفقة" : "Download Attached Ticket"}</a>
+                                    </div>
+                                  )}
+                                </td>
+                                <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.calculatedCost || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
+                              </tr>
+                              <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                                <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>🍔 {isAr ? "الوجبات" : "Meals Allowance"}</td>
+                                <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.calculatedMeals ?? parsedJson.mealCost ?? 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
+                              </tr>
+                              <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                                <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>☕ {isAr ? "القهوة" : "Coffee"}</td>
+                                <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.coffeeCost || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
+                              </tr>
+                              <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                                <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>✉️ {isAr ? "المراسلات" : "Correspondence Cost"}</td>
+                                <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.correspondenceCost || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
+                              </tr>
+                              <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                                <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>🅿️ {isAr ? "الباركينج" : "Parking & Tolls"}</td>
+                                <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.parkingCost || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
+                              </tr>
+                              <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                                <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>👥 {isAr ? "مصاريف اجتماع فريق" : "Team Meeting Expenses"}</td>
+                                <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontWeight: 700 }}>{Number(parsedJson.teamMeetingCost || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
+                              </tr>
+                              {parsedJson.additionalNotes && (
+                                <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                                  <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>📝 {isAr ? "ملاحظات إضافية:" : "Additional Notes:"}</td>
+                                  <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right", fontStyle: "italic", fontWeight: 600 }}>{parsedJson.additionalNotes}</td>
+                                </tr>
+                              )}
+                              {parsedJson.additionalAttachmentFileId && (
+                                <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                                  <td style={{ padding: "8px 10px", textAlign: isAr ? "right" : "left" }}>📎 {isAr ? "مرفق إضافي:" : "Extra Attachment:"}</td>
+                                  <td style={{ padding: "8px 10px", textAlign: isAr ? "left" : "right" }}>
+                                    <a href={`/api/files/${parsedJson.additionalAttachmentFileId}`} target="_blank" rel="noreferrer" style={{ color: "var(--color-primary)", textDecoration: "underline", fontWeight: 700 }}>
+                                      {parsedJson.additionalAttachmentFileName || (isAr ? "تحميل المرفق الإضافي" : "Download Attachment")}
+                                    </a>
+                                  </td>
+                                </tr>
+                              )}
+                              <tr style={{ background: "#ECFDF5", borderTop: "2px solid #10B981" }}>
+                                <td style={{ padding: "10px 10px", textAlign: isAr ? "right" : "left", fontWeight: 900, color: "#065F46" }}>💰 {isAr ? "الإجمالي المستحق (الصافي):" : "Grand Total:"}</td>
+                                <td style={{ padding: "10px 10px", textAlign: isAr ? "left" : "right", fontWeight: 950, color: "#047857", fontSize: 14 }}>{Number(parsedJson.totalCost || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--color-primary-light)", padding: "10px 14px", borderRadius: 8, marginTop: 4 }}>
+                            <span style={{ fontSize: 13, fontWeight: 900, color: "var(--color-primary)" }}>{isAr ? "إجمالي المستحق المالي للرحلة:" : "Total Calculated Allowance:"}</span>
+                            <span style={{ fontSize: 16, fontWeight: 900, color: "var(--color-primary)" }}>{Number(parsedJson.totalCost || parsedJson.calculatedAllowance || 0).toLocaleString()} {isAr ? "ج.م (EGP)" : "EGP"}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                          {parsedJson.routes?.map((r: any, rIdx: number) => (
+                            <div key={rIdx} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed var(--color-border)", paddingBottom: 6 }}>
+                              <span>📍 {r.from} ➔ {r.to} ({r.date})</span>
+                              <strong>{Number(r.cost || 0).toLocaleString()} {isAr ? "ج.م" : "EGP"}</strong>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : field.type === "section_header" ? (
+                    <div style={{ fontWeight: 800, fontSize: 14, color: "var(--color-primary)", borderBottom: "2px solid var(--color-primary)", paddingBottom: 4, marginTop: 8 }}>
+                      📌 {field.label}
+                    </div>
+                  ) : field.type === "info_notice" ? (
+                    <div style={{ background: "var(--color-primary-light)", color: "var(--color-primary)", padding: 12, borderRadius: 8, fontSize: 12 }}>
+                      ℹ️ {field.placeholder || field.label}
+                    </div>
+                  ) : field.type === "checkbox" ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600 }}>
+                      <span>{val ? "☑️" : "⬜"}</span>
+                      <span>{field.label}</span>
+                    </div>
+                  ) : field.type === "file" ? (
+                    <div>
+                      {val ? (
+                        <a href={`/api/files/${val}`} target="_blank" rel="noreferrer" className="btn btn-outline btn-sm" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                          📎 {isAr ? "تحميل المرفق" : "Download Attached Document"}
+                        </a>
+                      ) : (
+                        <span style={{ color: "var(--color-text-muted)", fontSize: 12 }}>{isAr ? "لا يوجد ملف مرفق" : "No document uploaded"}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 13, fontWeight: 600, padding: "8px 12px", background: "var(--color-bg)", borderRadius: 6, border: "1px solid var(--color-border)" }}>
+                      {val !== undefined && val !== null && val !== "" ? (parsedJson?.summaryText || String(val)) : "—"}
+                    </div>
+                  )}
+                </div>
+              );
+            };
+
+            // If custom sections are defined in workflow
+            if (visibleCustomSections.length > 0) {
+              return visibleCustomSections.map((section: any, sIdx: number) => {
+                const secFields = mainFields.filter((f: any) => {
+                  if (f.section === section.id || f.section === section.title) return true;
+                  const matchesOther = visibleCustomSections.some((o: any) => o.id !== section.id && (f.section === o.id || f.section === o.title));
+                  if (sIdx === 0 && !matchesOther) return true;
+                  return false;
+                });
+
+                return (
+                  <div key={section.id || sIdx} className="card">
+                    <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div className="card-title">📝 {section.title || "Ticket Form Details"}</div>
+                      <span className="tag">{secFields.length} {isAr ? "حقول" : "Fields"}</span>
+                    </div>
+                    <div className="card-body">
+                      <div className="detail-fields" style={{ gap: 16 }}>
+                        {secFields.length > 0 ? (
+                          secFields.map(renderFieldItem)
                         ) : (
-                          <div style={{ fontSize: 13, fontWeight: 600, padding: "8px 12px", background: "var(--color-bg)", borderRadius: 6, border: "1px solid var(--color-border)" }}>
-                            {val !== undefined && val !== null && val !== "" ? (parsedJson?.summaryText || String(val)) : "—"}
+                          <div style={{ gridColumn: "1 / -1", padding: 16, textAlign: "center", color: "var(--color-text-muted)", fontSize: 12 }}>
+                            {isAr ? "لا توجد حقول في هذا القسم." : "No fields in this section."}
                           </div>
                         )}
                       </div>
-                    );
-                  })
-                ) : (
-                  <div style={{ gridColumn: "1 / -1", padding: 16, textAlign: "center", color: "var(--color-text-muted)", fontSize: 12 }}>
-                    جميع حقول التذكرة تم ضبط موقعها في الهيدر العلوي واللوحة الجانبية.
+                    </div>
                   </div>
-                )}
+                );
+              });
+            }
+
+            // Default fallback: Single Main Details Card
+            return (
+              <div className="card">
+                <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div className="card-title">📝 {isAr ? "بيانات واستمارة المعاملة" : "Ticket Form Details"}</div>
+                  <span className="tag">{mainFields.length} Form Fields</span>
+                </div>
+                <div className="card-body">
+                  <div className="detail-fields" style={{ gap: 16 }}>
+                    {mainFields.length > 0 ? (
+                      mainFields.map(renderFieldItem)
+                    ) : (
+                      <div style={{ gridColumn: "1 / -1", padding: 16, textAlign: "center", color: "var(--color-text-muted)", fontSize: 12 }}>
+                        {isAr ? "جميع حقول التذكرة تم ضبط موقعها في الهيدر العلوي واللوحة الجانبية." : "All fields are positioned in header or sidebar."}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* ── ACTION BUTTONS PANEL (ITSM Standard Role Actions & Protection) ── */}
           {(() => {
@@ -1270,6 +1418,48 @@ export function TicketDetailView({
                           👁️ {request.observer_id || "Ahmed Mohamed, Sara Hassan"}
                         </div>
                       </div>
+
+                      {/* SECTION: Custom Form Fields Placed in Sidebar */}
+                      {sidebarFields.length > 0 && (
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed var(--color-border)' }}>
+                          <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--color-primary)', textTransform: 'uppercase', marginBottom: 6 }}>
+                            📊 Custom Sidebar Info Fields
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {sidebarFields.map((field: any) => {
+                              const key = field.key || field.id;
+                              const val = values?.[key];
+                              if (field.type === 'display_panel' || field.type === 'api_panel') {
+                                const queryVal = field.bound_field_key ? values?.[field.bound_field_key] : val;
+                                return (
+                                  <div key={field.id} style={{ marginTop: 4 }}>
+                                    <ExternalIntegrationsPanel
+                                      currentUserId={currentUser.id}
+                                      currentUserRole={currentUser.role}
+                                      targetApiId={field.api_integration_id}
+                                      initialQuery={queryVal ? String(queryVal) : undefined}
+                                      titleOverride={field.label}
+                                      searchLabel={field.api_search_label}
+                                      searchPlaceholder={field.placeholder}
+                                      buttonText={field.api_button_text}
+                                      visibleColumns={field.oracle_columns}
+                                      ownershipFilter={field.oracle_ownership_filter}
+                                    />
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div key={field.id} style={{ background: 'var(--color-surface)', padding: 6, borderRadius: 6, border: '1px solid var(--color-border)' }}>
+                                  <div style={{ fontSize: 9, color: "var(--color-text-muted)", fontWeight: 700 }}>{field.label}</div>
+                                  <div style={{ fontSize: 11, fontWeight: 800, color: "var(--color-text-primary)", marginTop: 2 }}>
+                                    {val !== undefined && val !== null && val !== "" ? String(val) : "—"}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1418,6 +1608,12 @@ export function TicketDetailView({
               </div>
             );
           })()}
+
+          {/* External API Integrations Panel */}
+          <ExternalIntegrationsPanel 
+            currentUserId={currentUser.id} 
+            currentUserRole={currentUser.role} 
+          />
         </div>
       </div>
 

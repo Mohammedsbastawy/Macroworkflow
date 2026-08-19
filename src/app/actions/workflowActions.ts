@@ -48,6 +48,7 @@ export async function createWorkflowFormAction(formData: {
     group_ids: string[];
     user_ids: string[];
     ticket_info_panel_config?: any;
+    custom_sections?: any[];
   };
 }) {
   const slug = formData.slug || formData.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
@@ -525,12 +526,12 @@ export async function fetchOrgHierarchyAction() {
     const rows = await dbGet('Departments');
     if (rows && rows.length > 0) {
       return rows.map((r: any) => ({
-        id: r.DepartmentID,
-        name: r.DepartmentName,
-        code: r.DepartmentCode,
-        parent_department_id: r.ParentDepartmentID,
-        manager_id: r.ManagerUserID,
-        head_user_id: r.HeadUserID,
+        id: r.id || r.DepartmentID,
+        name: r.name || r.DepartmentName,
+        code: r.code || r.DepartmentCode,
+        parent_department_id: r.parent_department_id || r.ParentDepartmentID,
+        manager_id: r.manager_id || r.ManagerUserID,
+        head_user_id: r.head_user_id || r.HeadUserID,
       }));
     }
   } catch (e) {
@@ -614,7 +615,7 @@ export async function fetchPoliciesAction() {
           department_id: deptId,
           description: r.Description,
           code: r.PolicyCode,
-          is_active: r.IsActive,
+          is_active: r.is_active !== undefined ? r.is_active : r.IsActive,
           rules_json: Array.isArray(rules) ? rules : [],
           apply_to_all: applyToAll,
           department_ids_json: deptIds,
@@ -906,10 +907,10 @@ export async function fetchTravelZonesAction() {
     const rows = await dbGet('TravelZones');
     if (rows && rows.length > 0) {
       return rows.map((r: any) => ({
-        id: r.TravelZoneID,
-        name: r.TravelZoneName,
-        code: r.TravelZoneCode,
-        is_active: r.IsActive,
+        id: r.id || r.TravelZoneID,
+        name: r.name || r.TravelZoneName,
+        code: r.code || r.TravelZoneCode,
+        is_active: r.is_active !== undefined ? r.is_active : r.IsActive,
       }));
     }
   } catch (e) {}
@@ -972,33 +973,44 @@ export async function fetchSystemUsersAction() {
     const rows = await dbGet('Users');
     if (rows && rows.length > 0) {
       const data = rows.map((r: any) => {
-        const rawRole = r.Role || 'selfservice';
+        const rawRole = r.role || r.Role || 'selfservice';
         const role = normalizeRole(rawRole);
         let roles: string[];
-        if (r.RolesJson) {
-          roles = r.RolesJson.map(normalizeRole);
-        } else if (Array.isArray(r.Roles)) {
-          roles = r.Roles.map(normalizeRole);
+        
+        let rRolesJson = r.roles_json || r.RolesJson;
+        let rRoles = r.roles || r.Roles;
+        if (typeof rRolesJson === 'string') try { rRolesJson = JSON.parse(rRolesJson); } catch(e) {}
+        if (typeof rRoles === 'string') try { rRoles = JSON.parse(rRoles); } catch(e) {}
+        
+        if (rRolesJson && Array.isArray(rRolesJson)) {
+          roles = rRolesJson.map(normalizeRole);
+        } else if (Array.isArray(rRoles)) {
+          roles = rRoles.map(normalizeRole);
         } else {
           roles = [role];
         }
+
+        let gIds = r.group_ids_json || r.GroupIDsJson || [];
+        if (typeof gIds === 'string') try { gIds = JSON.parse(gIds); } catch(e) {}
+        if (!Array.isArray(gIds)) gIds = [];
+
         return {
-          id: r.UserID,
-          name: r.UserName,
-          email: r.UserEmail,
-          department_id: r.DepartmentID,
-          job_title: r.JobTitle,
-          direct_manager_id: r.DirectManagerUserID,
-          unit: r.Unit,
-          avatar_initials: r.AvatarInitials,
-          is_active: r.IsActive,
-          username: r.LoginName, 
-          phone: r.Phone,
+          id: r.id || r.UserID,
+          name: r.name || r.UserName,
+          email: r.email || r.UserEmail,
+          department_id: r.department_id || r.DepartmentID,
+          job_title: r.job_title || r.JobTitle,
+          direct_manager_id: r.direct_manager_id || r.DirectManagerUserID,
+          unit: r.unit || r.Unit,
+          avatar_initials: r.avatar_initials || r.AvatarInitials,
+          is_active: r.is_active !== undefined ? r.is_active : r.IsActive,
+          username: r.username || r.LoginName, 
+          phone: r.phone || r.Phone,
           role,
           roles,
           role_raw: rawRole,
-          group_ids: r.GroupIDsJson || [],
-          group_ids_json: r.GroupIDsJson || [],
+          group_ids: gIds,
+          group_ids_json: gIds,
         };
       });
       cachedUsers = { data, timestamp: now };
@@ -1056,10 +1068,10 @@ export async function saveSystemUserAction(payload: {
   if (payload.username !== undefined) record.LoginName = payload.username;
   if (payload.auth_type) record.AuthType = payload.auth_type;
   if (payload.phone !== undefined) record.Phone = payload.phone;
-  if (payload.delegated_user_id !== undefined) record.DelegatedUserId = payload.delegated_user_id;
+  if (payload.delegated_user_id !== undefined) record.DelegatedUserId = payload.delegated_user_id || null;
   if (payload.delegation_enabled !== undefined) record.DelegationEnabled = payload.delegation_enabled;
-  if (payload.delegation_start_date !== undefined) record.DelegationStartDate = payload.delegation_start_date;
-  if (payload.delegation_end_date !== undefined) record.DelegationEndDate = payload.delegation_end_date;
+  if (payload.delegation_start_date !== undefined) record.DelegationStartDate = payload.delegation_start_date || null;
+  if (payload.delegation_end_date !== undefined) record.DelegationEndDate = payload.delegation_end_date || null;
   if (payload.delegation_notes !== undefined) record.DelegationNotes = payload.delegation_notes;
   if (payload.can_assign_group_tickets !== undefined) record.CanAssignGroupTickets = payload.can_assign_group_tickets;
 
@@ -1096,12 +1108,12 @@ export async function fetchBusinessGroupsAction() {
     const rows = await dbGet('BusinessGroups');
     if (rows && rows.length > 0) {
       return rows.map((r: any) => ({
-        id: r.BusinessGroupID,
-        name: r.BusinessGroupName,
-        code: r.BusinessGroupCode,
-        is_active: r.IsActive,
-        member_user_ids: r.MemberUserIDsJson || [],
-        member_user_ids_json: r.MemberUserIDsJson || [],
+        id: r.id || r.BusinessGroupID,
+        name: r.name || r.BusinessGroupName,
+        code: r.code || r.BusinessGroupCode,
+        is_active: r.is_active !== undefined ? r.is_active : r.IsActive,
+        member_user_ids: (typeof(r.member_user_ids_json || r.MemberUserIDsJson) === 'string' ? JSON.parse(r.member_user_ids_json || r.MemberUserIDsJson) : (r.member_user_ids_json || r.MemberUserIDsJson || [])),
+        member_user_ids_json: (typeof(r.member_user_ids_json || r.MemberUserIDsJson) === 'string' ? JSON.parse(r.member_user_ids_json || r.MemberUserIDsJson) : (r.member_user_ids_json || r.MemberUserIDsJson || [])),
       }));
     }
   } catch (e) {
@@ -1492,3 +1504,25 @@ export async function assignTicketUserAction(ticketId: string, assignedUser: str
   revalidatePath(`/requests/${ticketId}`);
   return { success: true };
 }
+
+/**
+ * Fetch list of active API integrations for Form Builder & Field Binding
+ */
+export async function fetchApiIntegrationsAction() {
+  try {
+    const { dbQuery } = await import("@/lib/db/mysqlClient");
+    const rows = await dbQuery(
+      "SELECT id, name, provider, endpoint_url, auth_type FROM api_integrations WHERE is_active = 1 ORDER BY name ASC"
+    );
+    return rows.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      provider: r.provider,
+      endpoint_url: r.endpoint_url,
+      auth_type: r.auth_type,
+    }));
+  } catch (e) {
+    console.error("fetchApiIntegrationsAction error:", e);
+    return [];
+  }
+}
