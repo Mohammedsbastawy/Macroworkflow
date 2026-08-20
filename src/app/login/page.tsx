@@ -7,6 +7,7 @@ import {
   loginWithPasswordAction,
   startMicrosoftSignInAction,
 } from "@/app/actions/authActions";
+import { safeStorage } from "@/lib/safeStorage";
 
 const ERROR_MESSAGES: Record<string, string> = {
   not_provisioned:
@@ -39,6 +40,18 @@ function LoginForm() {
   );
 
   useEffect(() => {
+    // Clear any stale simulated user state on the login screen
+    safeStorage.removeItem("simulated_user_id");
+    safeStorage.removeItem("system_user");
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("simulated_user_id");
+        localStorage.removeItem("system_user");
+      } catch (e) {}
+    }
+  }, []);
+
+  useEffect(() => {
     if (status === "authenticated") {
       router.replace(callbackUrl.startsWith("/") ? callbackUrl : "/");
     }
@@ -49,6 +62,14 @@ function LoginForm() {
     setError(null);
     setLoading(true);
     try {
+      safeStorage.removeItem("simulated_user_id");
+      safeStorage.removeItem("system_user");
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.removeItem("simulated_user_id");
+          localStorage.removeItem("system_user");
+        } catch (e) {}
+      }
       const fd = new FormData();
       fd.set("username", username);
       fd.set("password", password);

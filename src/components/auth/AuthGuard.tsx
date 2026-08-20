@@ -62,7 +62,7 @@ export function AuthGuard({ children, requiredModule, allowRoles }: AuthGuardPro
         }
 
         const savedSimulatedId = safeStorage.getItem("simulated_user_id");
-        if (savedSimulatedId) {
+        if (savedSimulatedId && savedSimulatedId !== sessionUserId) {
           const foundSim = dbUsers.find((u: any) => u.id === savedSimulatedId);
           if (foundSim) {
             setSimulatedUser(foundSim as any);
@@ -72,6 +72,9 @@ export function AuthGuard({ children, requiredModule, allowRoles }: AuthGuardPro
           }
         } else {
           setSimulatedUser(null);
+          if (savedSimulatedId === sessionUserId) {
+            safeStorage.removeItem("simulated_user_id");
+          }
           if (foundSessionUser) {
             safeStorage.setItem("system_user", JSON.stringify(foundSessionUser));
           }

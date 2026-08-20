@@ -36,11 +36,13 @@ export function Topbar() {
 
   const sessionUserId = (session?.user?.id as string) || "";
   const sessionRole = (session?.user?.role as string) || "";
-  const isAdmin = sessionRole === "admin";
+  const sessionRoles = (session?.user?.roles as string[]) || [sessionRole];
+  const isSessionAdmin = sessionRole === "admin" || sessionRoles.includes("admin");
 
   const [currentUser, setCurrentUser] = useState<TopbarUser | null>(null);
   const [usersList, setUsersList] = useState<SystemUser[]>([]);
   const [showMobileUserDrawer, setShowMobileUserDrawer] = useState(false);
+  const [isSimulating, setIsSimulating] = useState(false);
 
   useEffect(() => {
     if (!sessionUserId) return;
@@ -54,13 +56,16 @@ export function Topbar() {
 
         // Check if there is an active simulated user stored
         const savedSimulatedId = safeStorage.getItem("simulated_user_id");
-        if (savedSimulatedId) {
+        if (savedSimulatedId && savedSimulatedId !== sessionUserId) {
+          setIsSimulating(true);
           const simulatedFound = fetched?.find((u) => u.id === savedSimulatedId);
           if (simulatedFound) {
             setCurrentUser(simulatedFound as unknown as TopbarUser);
             safeStorage.setItem("system_user", JSON.stringify(simulatedFound));
             return;
           }
+        } else {
+          setIsSimulating(false);
         }
 
         const found =
@@ -79,7 +84,8 @@ export function Topbar() {
       } catch (e) {
         if (!cancelled) {
           const savedSimulatedId = safeStorage.getItem("simulated_user_id");
-          if (savedSimulatedId) {
+          if (savedSimulatedId && savedSimulatedId !== sessionUserId) {
+            setIsSimulating(true);
             const rawUser = safeStorage.getItem("system_user");
             if (rawUser) {
               try {
@@ -90,6 +96,8 @@ export function Topbar() {
                 }
               } catch (err) {}
             }
+          } else {
+            setIsSimulating(false);
           }
           setCurrentUser({
             id: sessionUserId,
@@ -105,11 +113,18 @@ export function Topbar() {
 
     const handleSwitch = () => {
       const savedId = safeStorage.getItem("simulated_user_id");
-      if (savedId && usersList.length > 0) {
-        const found = usersList.find((u) => u.id === savedId);
-        if (found) {
-          setCurrentUser(found as unknown as TopbarUser);
+      if (savedId && savedId !== sessionUserId) {
+        setIsSimulating(true);
+        if (usersList.length > 0) {
+          const found = usersList.find((u) => u.id === savedId);
+          if (found) {
+            setCurrentUser(found as unknown as TopbarUser);
+          }
         }
+      } else {
+        setIsSimulating(false);
+        const selfFound = usersList.find((u) => u.id === sessionUserId);
+        if (selfFound) setCurrentUser(selfFound as unknown as TopbarUser);
       }
     };
 
@@ -124,8 +139,13 @@ export function Topbar() {
   }, [sessionUserId, sessionRole, session?.user?.name, session?.user?.email, usersList.length]);
 
   const handleSwitchUser = (userId: string) => {
+    if (userId === sessionUserId) {
+      handleExitSimulation();
+      return;
+    }
     const found = usersList.find((u) => u.id === userId);
     if (found) {
+      setIsSimulating(true);
       setCurrentUser(found as unknown as TopbarUser);
       safeStorage.setItem("simulated_user_id", userId);
       safeStorage.setItem("system_user", JSON.stringify(found));
@@ -134,12 +154,27 @@ export function Topbar() {
     }
   };
 
+  const handleExitSimulation = () => {
+    safeStorage.removeItem("simulated_user_id");
+    safeStorage.removeItem("system_user");
+    setIsSimulating(false);
+    const selfFound = usersList.find((u) => u.id === sessionUserId);
+    if (selfFound) {
+      setCurrentUser(selfFound as unknown as TopbarUser);
+      safeStorage.setItem("system_user", JSON.stringify(selfFound));
+    }
+    window.dispatchEvent(new Event("user-simulated-switch"));
+    window.dispatchEvent(new Event("system_user_changed"));
+    window.location.reload();
+  };
+
   const handleLogout = async () => {
     try {
       const { logoutAction } = await import("@/app/actions/authActions");
       await logoutAction();
     } catch (e) {}
     safeStorage.removeItem("simulated_user_id");
+    safeStorage.removeItem("system_user");
     window.location.href = "/login";
   };
 
@@ -216,10 +251,36 @@ export function Topbar() {
           {/* 🔔 Notification Bell — beside language & profile on all viewports */}
           {displayUser.id && <NotificationBell currentUserId={displayUser.id} />}
 
-          {/* Desktop IAM User Simulator Dropdown (admins only — for support/impersonation) */}
-          {isAdmin && displayUser.id && (
-            <div className="desktop-only" style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--color-primary-light)", padding: "4px 10px", borderRadius: "var(--radius-md)", border: "1px solid #BFDBFE" }} suppressHydrationWarning>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-primary)" }}>🔑 IAM User:</span>
+          {/* ↩️ Exit Simulation Button (Visible whenever simulation is active) */}
+          {isSimulating && (
+            <button
+              onClick={handleExitSimulation}
+              title={lang === "ar" ? "إنهاء وضع المحاكاة والعودة لحساب الآدمن" : "Exit simulation & return to Admin"}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                background: "#FEF3C7",
+                border: "1px solid #F59E0B",
+                padding: "5px 12px",
+                borderRadius: "var(--radius-md)",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 800,
+                color: "#B45309",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                animation: "pulse 2s infinite"
+              }}
+            >
+              <span>↩️</span>
+              <span>{lang === "ar" ? "إنهاء المحاكاة (العودة للآدمن)" : "Exit Simulation"}</span>
+            </button>
+          )}
+
+          {/* Desktop IAM User Simulator Dropdown (admins or active simulation) */}
+          {(isSessionAdmin || isSimulating) && displayUser.id && (
+            <div className="desktop-only" style={{ display: "flex", alignItems: "center", gap: 6, background: isSimulating ? "#FEF3C7" : "var(--color-primary-light)", padding: "4px 10px", borderRadius: "var(--radius-md)", border: isSimulating ? "1px solid #F59E0B" : "1px solid #BFDBFE" }} suppressHydrationWarning>
+              <span style={{ fontSize: 11, fontWeight: 700, color: isSimulating ? "#B45309" : "var(--color-primary)" }}>🔑 IAM User:</span>
               <select
                 className="form-control"
                 style={{ fontSize: 12, padding: "2px 6px", border: "none", background: "none", fontWeight: 700, color: "var(--color-text-primary)", width: "auto" }}
@@ -241,7 +302,7 @@ export function Topbar() {
           )}
 
           {/* Mobile IAM Quick Switcher Trigger (Opens Drawer) */}
-          {isAdmin && displayUser.id && (
+          {(isSessionAdmin || isSimulating) && displayUser.id && (
             <button
               className="mobile-only-user-btn"
               onClick={() => setShowMobileUserDrawer(true)}
@@ -291,7 +352,7 @@ export function Topbar() {
       </header>
 
       {/* 📱 DEDICATED MOBILE USER SELECTOR BOTTOM SHEET DRAWER */}
-      {showMobileUserDrawer && isAdmin && (
+      {showMobileUserDrawer && (isSessionAdmin || isSimulating) && (
         <div
           className="mobile-drawer-backdrop"
           onClick={() => setShowMobileUserDrawer(false)}

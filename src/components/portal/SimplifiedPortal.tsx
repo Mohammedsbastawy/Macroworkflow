@@ -80,8 +80,66 @@ export function SimplifiedPortal() {
     return { icon: "📝", color: "#8B5CF6", desc: lang === "ar" ? "الخدمات العامة والنماذج الإدارية" : "General Services & Administrative Forms" };
   };
 
+  const isSimulating = typeof window !== "undefined" && Boolean(localStorage.getItem("simulated_user_id"));
+
   return (
     <div style={{ maxWidth: 1140, margin: "0 auto", paddingBottom: 40 }}>
+      {/* ⚠️ Simulation Active Notice */}
+      {isSimulating && (
+        <div style={{
+          background: "#FEF3C7",
+          border: "1px solid #F59E0B",
+          padding: "12px 18px",
+          borderRadius: 10,
+          marginBottom: 16,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          boxShadow: "0 2px 8px rgba(245, 158, 11, 0.15)",
+          flexWrap: "wrap",
+          gap: 10
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 20 }}>👁️</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#92400E" }}>
+                {lang === "ar" ? "أنت تتصفح حالياً في وضع المحاكاة التجريبي" : "You are currently browsing in Simulation Mode"}
+              </div>
+              <div style={{ fontSize: 11, color: "#B45309", fontWeight: 600 }}>
+                {lang === "ar" ? `الحساب المعروض: ${currentUser.name} (${currentUser.role.toUpperCase()})` : `Simulated User: ${currentUser.name} (${currentUser.role.toUpperCase()})`}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("simulated_user_id");
+                localStorage.removeItem("system_user");
+                window.dispatchEvent(new Event("user-simulated-switch"));
+                window.dispatchEvent(new Event("system_user_changed"));
+                window.location.href = "/";
+              }
+            }}
+            style={{
+              background: "#D97706",
+              color: "#FFFFFF",
+              border: "none",
+              padding: "7px 14px",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 800,
+              display: "flex",
+              alignItems: "center",
+              gap: 6
+            }}
+          >
+            <span>↩️</span>
+            <span>{lang === "ar" ? "إنهاء المحاكاة والعودة للوحة التحكم" : "Exit Simulation & Return to Dashboard"}</span>
+          </button>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div
         className="card"
